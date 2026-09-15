@@ -132,6 +132,8 @@ document.querySelectorAll('.admin-nav button').forEach(function (btn) {
     if (tab === 'usuarios') renderUsersTable();
     if (tab === 'vendas') renderSales();
     if (tab === 'backup') loadAdminCredsFields();
+    if (tab === 'aparencia') loadAllAdminFields();
+    if (tab === 'contato') renderSocialEditor();
   });
 });
 
@@ -215,6 +217,26 @@ function updateSobrePreview() {
   }
 }
 
+/* ------------------------------------------------------------
+   Helper: descreve o caminho da imagem para exibir no toast
+   - data URL (upload local): mostra "upload local (X KB)"
+   - URL externa: mostra a URL
+   - Caminho relativo: monta URL absoluta
+   ------------------------------------------------------------ */
+function describeImagePath(data) {
+  if (!data) return 'sem imagem';
+  var s = String(data);
+  if (s.indexOf('data:') === 0) {
+    var base64 = s.split(',')[1] || '';
+    var bytes = Math.round(base64.length * 0.75);
+    return 'upload local (' + formatBytes(bytes) + ')';
+  }
+  if (/^https?:\/\//i.test(s)) return s;
+  var origin = window.location.origin;
+  var path = s.charAt(0) === '/' ? s : '/' + s;
+  return origin + path;
+}
+
 function bindUpload(inputId, callback) {
   var input = document.getElementById(inputId);
   if (!input) return;
@@ -235,9 +257,30 @@ function bindUpload(inputId, callback) {
     input.value = '';
   });
 }
-bindUpload('bgUpload', function (d) { CONTENT.branding.bgImage = d; applyContentToSite(); loadAllAdminFields(); saveContent(); toast('Imagem de fundo atualizada.', '🖼'); });
-bindUpload('vinylUpload', function (d) { CONTENT.hero.vinylImage = d; applyContentToSite(); loadAllAdminFields(); saveContent(); toast('Imagem do vinil atualizada.', '🖼'); });
-bindUpload('sobreUpload', function (d) { CONTENT.sobre.image = d; applyContentToSite(); loadAllAdminFields(); saveContent(); toast('Imagem do Sobre atualizada.', '🖼'); });
+
+bindUpload('bgUpload', function (d) {
+  CONTENT.branding.bgImage = d;
+  applyContentToSite();
+  loadAllAdminFields();
+  saveContent();
+  toast('Imagem de fundo atualizada — ' + describeImagePath(d), '🖼');
+});
+
+bindUpload('vinylUpload', function (d) {
+  CONTENT.hero.vinylImage = d;
+  applyContentToSite();
+  loadAllAdminFields();
+  saveContent();
+  toast('Imagem do vinil atualizada — ' + describeImagePath(d), '🖼');
+});
+
+bindUpload('sobreUpload', function (d) {
+  CONTENT.sobre.image = d;
+  applyContentToSite();
+  loadAllAdminFields();
+  saveContent();
+  toast('Imagem da seção Sobre atualizada — ' + describeImagePath(d), '🖼');
+});
 
 /* ============================================================
    Frases
