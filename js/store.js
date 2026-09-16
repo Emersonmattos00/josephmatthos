@@ -533,6 +533,8 @@ const Store = (() => {
     } else {
       creds.passHash = current.passHash;
     }
+
+    creds.passwordChangedAt = plainPass ? Date.now() : current.passwordChangedAt;
     
     const success = writeStorage(STORAGE_KEYS.ADMIN, creds);
     
@@ -540,6 +542,23 @@ const Store = (() => {
       log('Credenciais do admin salvas');
     }
     
+    return success;
+  }
+
+  async function isAdminFirstAccess() {
+    const creds = await getAdminCreds();
+    if (creds.user !== 'admin' || creds.passwordChangedAt) return false;
+    const result = typeof verifyPassword === 'function'
+      ? await verifyPassword('admin123', creds.passHash)
+      : { ok: false };
+    return result.ok;
+  }
+
+  async function resetAdminCreds() {
+    const success = writeStorage(STORAGE_KEYS.ADMIN, {
+      user: 'admin',
+      passHash: typeof hashStr === 'function' ? await hashStr('admin123') : 'admin123'
+    });
     return success;
   }
 
@@ -1086,6 +1105,8 @@ const Store = (() => {
     // Admin
     getAdminCreds,
     saveAdminCreds,
+    isAdminFirstAccess,
+    resetAdminCreds,
     getAdminSession,
     setAdminSession,
     
@@ -1183,6 +1204,8 @@ window.formatPrice = Store.formatPrice;
 
 window.getAdminCreds = Store.getAdminCreds;
 window.saveAdminCreds = Store.saveAdminCreds;
+window.isAdminFirstAccess = Store.isAdminFirstAccess;
+window.resetAdminCreds = Store.resetAdminCreds;
 
 window.getContent = Store.getContent;
 window.setContent = Store.setContent;

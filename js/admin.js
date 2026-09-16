@@ -19,11 +19,14 @@ var adminTabTitles = {
   backup: 'Backup'
 };
 
+var adminPendingFirstAccess = null;
+
 function showAdminLogin() {
   var loginEl = document.getElementById('adminLogin');
   var dashEl = document.getElementById('adminDashboard');
   if (loginEl) loginEl.style.display = 'flex';
   if (dashEl) dashEl.style.display = 'none';
+  showAdminLoginForm();
 }
 
 function showAdminDashboard() {
@@ -33,6 +36,27 @@ function showAdminDashboard() {
   if (dashEl) dashEl.style.display = 'grid';
   renderAdminDashboard();
   loadAllAdminFields();
+}
+
+function showAdminPasswordChange() {
+  var loginForm = document.getElementById('adminLoginForm');
+  var changeForm = document.getElementById('adminPasswordChangeForm');
+  var forgotBtn = document.getElementById('adminForgotPassword');
+  if (loginForm) loginForm.style.display = 'none';
+  if (changeForm) changeForm.style.display = 'block';
+  if (forgotBtn) forgotBtn.style.display = 'none';
+  var newPass = document.getElementById('adminNewPass');
+  if (newPass) newPass.focus();
+}
+
+function showAdminLoginForm() {
+  var loginForm = document.getElementById('adminLoginForm');
+  var changeForm = document.getElementById('adminPasswordChangeForm');
+  var forgotBtn = document.getElementById('adminForgotPassword');
+  if (loginForm) loginForm.style.display = 'block';
+  if (changeForm) changeForm.style.display = 'none';
+  if (forgotBtn) forgotBtn.style.display = 'block';
+  adminPendingFirstAccess = null;
 }
 
 /* ---------- Bind de elementos do admin (com guards) ---------- */
@@ -77,11 +101,50 @@ function showAdminDashboard() {
       if (result.needsMigration) {
         try { await saveAdminCreds(user, pass); } catch (e) {}
       }
+      if (typeof isAdminFirstAccess === 'function' && await isAdminFirstAccess()) {
+        adminPendingFirstAccess = { user: user };
+        showAdminPasswordChange();
+        return;
+      }
       err.textContent = '';
       sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
       e.target.reset();
       showAdminDashboard();
       toast('Bem-vindo ao painel.', '⚙');
+    });
+  }
+
+  var passwordChangeForm = document.getElementById('adminPasswordChangeForm');
+  if (passwordChangeForm) {
+    passwordChangeForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var err = document.getElementById('adminPasswordChangeError');
+      var pass = document.getElementById('adminNewPass').value;
+      var confirmPass = document.getElementById('adminNewPassConfirm').value;
+      if (pass.length < 8) { err.textContent = 'A nova senha deve ter pelo menos 8 caracteres.'; return; }
+      if (pass !== confirmPass) { err.textContent = 'As senhas não conferem.'; return; }
+      if (!adminPendingFirstAccess) { showAdminLoginForm(); return; }
+      var saved = await saveAdminCreds(adminPendingFirstAccess.user, pass);
+      if (!saved) { err.textContent = 'Não foi possível salvar a nova senha.'; return; }
+      sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
+      passwordChangeForm.reset();
+      showAdminDashboard();
+      toast('Senha atualizada. Bem-vindo ao painel.', '⚙');
+    });
+  }
+
+  var forgotBtn = document.getElementById('adminForgotPassword');
+  if (forgotBtn) {
+    forgotBtn.addEventListener('click', async function () {
+      var err = document.getElementById('adminLoginError');
+      if (typeof isProductionMode === 'function' && isProductionMode()) {
+        err.textContent = 'No Vercel, redefina ADMIN_PASSWORD_HASH e publique novamente.';
+        return;
+      }
+      if (!confirm('Restaurar o acesso para admin / admin123?')) return;
+      var reset = await resetAdminCreds();
+      err.textContent = reset ? 'Acesso restaurado. Use admin / admin123.' : 'Não foi possível restaurar o acesso.';
+      if (reset) showAdminLoginForm();
     });
   }
 
@@ -127,7 +190,7 @@ function openAdminSite() {
       if (valid) showAdminDashboard();
     });
   } else if (sessionStorage.getItem(ADMIN_SESSION_KEY)) showAdminDashboard();
-  else showAdminLogin();
+  else { showAdminLogin(); showAdminLoginForm(); }
 }
 
 function openPublicSite() {

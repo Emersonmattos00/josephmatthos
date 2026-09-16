@@ -100,6 +100,10 @@ openssl rand -hex 32
 ```
 
 O modo demo continua disponível em `localhost`, usando `admin` / `admin123`.
+No primeiro acesso do modo demo, a troca da senha é obrigatória. O link
+`Esqueci minha senha` restaura as credenciais demo para `admin` / `admin123`.
+Em produção, a redefinição deve ser feita atualizando `ADMIN_PASSWORD_HASH` no
+Vercel; não existe senha universal de recuperação no ambiente publicado.
 
 ### Próxima arquitetura de produção
 
