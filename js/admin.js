@@ -96,12 +96,13 @@ function showAdminLoginForm() {
 
       var creds = await getAdminCreds();
       if (user !== creds.user) { err.textContent = 'Usuário ou senha incorretos.'; return; }
+      var firstAccess = typeof isAdminFirstAccess === 'function' && await isAdminFirstAccess();
       var result = await verifyPassword(pass, creds.passHash);
       if (!result.ok) { err.textContent = 'Usuário ou senha incorretos.'; return; }
       if (result.needsMigration) {
         try { await saveAdminCreds(user, pass); } catch (e) {}
       }
-      if (typeof isAdminFirstAccess === 'function' && await isAdminFirstAccess()) {
+      if (firstAccess) {
         adminPendingFirstAccess = { user: user };
         showAdminPasswordChange();
         return;
@@ -138,7 +139,7 @@ function showAdminLoginForm() {
     forgotBtn.addEventListener('click', async function () {
       var err = document.getElementById('adminLoginError');
       if (typeof isProductionMode === 'function' && isProductionMode()) {
-        err.textContent = 'No Vercel, redefina ADMIN_PASSWORD_HASH e publique novamente.';
+        err.textContent = 'Para redefinir em produção, gere um novo hash bcrypt e atualize ADMIN_PASSWORD_HASH no Vercel. Depois faça um novo deploy.';
         return;
       }
       if (!confirm('Restaurar o acesso para admin / admin123?')) return;
