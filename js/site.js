@@ -466,6 +466,7 @@ var isSeeking = false;
 var lastVolume = 0.8;
 var muted = false;
 var previewState = { active: false, start: 0, end: 0 };
+var previewNoticeTrackKey = '';
 
 function refreshFlatPlaylist() { flatPlaylist = buildFlatPlaylist(); }
 try {
@@ -512,6 +513,7 @@ async function playFromDiscography(albumId, trackIndex) {
   if (!resolved) { toast('Áudio enviado não encontrado neste navegador.', '⚠'); return; }
 
   previewState = { active: cfg.isPreview, start: cfg.start, end: cfg.end };
+  previewNoticeTrackKey = '';
   audio.src = resolved;
   audio.load();
 
@@ -696,8 +698,7 @@ async function downloadTrack(albumId, trackIndex) {
   }
   var album = CONTENT.discografia.albums.find(function (a) { return a.id === albumId; });
   var track = album && album.tracks[trackIndex];
-    if (!track) return;
-    var activePlaylistShuffle = isPremium() && album ? album.tracks.map(function (track, index) { return { album: album, track: track, trackIndex: index }; }) : null;
+  if (!track) return;
   var srcUrl = track.fullAudio || track.previewAudio;
   if (!srcUrl) { toast('Esta faixa não tem áudio cadastrado.', '⚠'); return; }
   toast('Preparando download...', '⬇');
@@ -802,9 +803,10 @@ audio.addEventListener('timeupdate', function () {
     if (currentTimeEl) currentTimeEl.textContent = formatTime(previewState.end - previewState.start);
     var progressBarEl = document.getElementById('progressBar');
     if (progressBarEl) progressBarEl.setAttribute('aria-valuenow', 100);
-    if (!window._previewToastShown || Date.now() - window._previewToastShown > 8000) {
+    var previewTrackKey = currentTrackIdentity ? currentTrackIdentity.albumId + ':' + currentTrackIdentity.trackIndex : '';
+    if (previewNoticeTrackKey !== previewTrackKey) {
       toast('Prévia encerrada. Assine ou compre a faixa para ouvir completa.', '🎧');
-      window._previewToastShown = Date.now();
+      previewNoticeTrackKey = previewTrackKey;
     }
     return;
   }
