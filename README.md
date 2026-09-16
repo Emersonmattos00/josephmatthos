@@ -87,6 +87,11 @@ vercel env add ADMIN_PASSWORD_HASH production
 vercel env add ADMIN_SESSION_SECRET production
 vercel env add SUPABASE_URL production
 vercel env add SUPABASE_ANON_KEY production
+vercel env add SUPABASE_SERVICE_ROLE_KEY production
+vercel env add MP_ACCESS_TOKEN production
+vercel env add MP_BACK_URL production
+vercel env add MP_PREMIUM_MONTHLY_PRICE production
+vercel env add MP_PREMIUM_ANNUAL_PRICE production
 ```
 
 Gere o hash bcrypt localmente antes de cadastrar a senha:
@@ -111,6 +116,11 @@ Para a autenticação pública, crie um projeto Supabase, configure o envio de
 e-mail de confirmação conforme a política do produto e cadastre `SUPABASE_URL`
 e `SUPABASE_ANON_KEY` no Vercel. As chaves ficam no backend; não use a
 `service_role` no navegador.
+
+Execute `supabase/schema.sql` no SQL Editor do Supabase. Depois configure as
+notificações de assinatura do Mercado Pago para apontar para
+`https://seu-dominio.com/api/payments-webhook`. O site usa checkout hospedado;
+nenhum número de cartão é recebido pelo frontend.
 
 ### Próxima arquitetura de produção
 

@@ -931,13 +931,19 @@ function refreshPlanConfig() {
   CONTENT.planos.plans.forEach(function (p) { planConfig[p.id] = { name: p.name, desc: p.desc, price: p.price, suffix: p.suffix }; });
 }
 var selectedPlan = 'premium';
-function openSubscribeModal(planId) {
+async function openSubscribeModal(planId) {
+  selectedPlan = planId;
   if (typeof isProductionMode === 'function' && isProductionMode()) {
-    toast('Pagamentos reais ainda não estão configurados.', '⚠');
+    toast('Abrindo checkout seguro...', '✦');
+    try {
+      var paymentResponse = await fetch('/api/payments-subscription', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ plan: planId }) });
+      var paymentResult = await paymentResponse.json();
+      if (!paymentResponse.ok || !paymentResult.ok) { toast(paymentResult.error || 'Pagamento ainda não configurado.', '⚠'); return; }
+      window.location.assign(paymentResult.checkoutUrl);
+    } catch (error) { toast('Gateway de pagamento indisponível.', '⚠'); }
     return;
   }
   if (!currentUser()) { toast('Crie uma conta para assinar.', 'ℹ'); openModal('signupModal'); return; }
-  selectedPlan = planId;
   var cfg = planConfig[planId] || { name: planId, desc: '', price: '', suffix: '' };
   document.getElementById('subPlanName').textContent = cfg.name;
   document.getElementById('subPlanDesc').textContent = cfg.desc;

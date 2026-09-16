@@ -9,6 +9,10 @@ function getConfig() {
   };
 }
 
+function getAdminKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+}
+
 function sendJson(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -26,6 +30,29 @@ async function supabaseRequest(path, options) {
     ...options,
     headers: {
       apikey: config.anonKey,
+      'Content-Type': 'application/json',
+      ...(options && options.headers ? options.headers : {})
+    }
+  });
+  const text = await response.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (error) { body = null; }
+  return { response, body };
+}
+
+async function supabaseAdminRequest(path, options) {
+  const config = getConfig();
+  const adminKey = getAdminKey();
+  if (!config.url || !adminKey) {
+    const error = new Error('Supabase admin não configurado.');
+    error.code = 'NOT_CONFIGURED';
+    throw error;
+  }
+  const response = await fetch(config.url + path, {
+    ...options,
+    headers: {
+      apikey: adminKey,
+      Authorization: 'Bearer ' + adminKey,
       'Content-Type': 'application/json',
       ...(options && options.headers ? options.headers : {})
     }
@@ -78,8 +105,10 @@ async function getAuthUser(req) {
 
 module.exports = {
   clearAuthCookies,
+  getAccessToken,
   getAuthUser,
   sendJson,
   setAuthCookies,
-  supabaseRequest
+  supabaseRequest,
+  supabaseAdminRequest
 };
