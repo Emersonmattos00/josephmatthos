@@ -85,6 +85,8 @@ navegador. Configure estas variáveis no projeto Vercel:
 vercel env add ADMIN_USER production
 vercel env add ADMIN_PASSWORD_HASH production
 vercel env add ADMIN_SESSION_SECRET production
+vercel env add SUPABASE_URL production
+vercel env add SUPABASE_ANON_KEY production
 ```
 
 Gere o hash bcrypt localmente antes de cadastrar a senha:
@@ -104,6 +106,11 @@ No primeiro acesso do modo demo, a troca da senha é obrigatória. O link
 `Esqueci minha senha` restaura as credenciais demo para `admin` / `admin123`.
 Em produção, a redefinição deve ser feita atualizando `ADMIN_PASSWORD_HASH` no
 Vercel; não existe senha universal de recuperação no ambiente publicado.
+
+Para a autenticação pública, crie um projeto Supabase, configure o envio de
+e-mail de confirmação conforme a política do produto e cadastre `SUPABASE_URL`
+e `SUPABASE_ANON_KEY` no Vercel. As chaves ficam no backend; não use a
+`service_role` no navegador.
 
 ### Próxima arquitetura de produção
 

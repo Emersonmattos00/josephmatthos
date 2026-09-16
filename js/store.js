@@ -599,6 +599,9 @@ const Store = (() => {
   }
 
   function currentUser() {
+    if (isProductionMode()) {
+      return (typeof window !== 'undefined' && window.PRODUCTION_USER) || null;
+    }
     const session = getSession();
     if (!session || !session.userId) return null;
     

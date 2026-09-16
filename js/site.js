@@ -781,13 +781,29 @@ document.getElementById('signupBtn').addEventListener('click', function () { ope
 document.getElementById('switchToSignup').addEventListener('click', function () { closeModal('loginModal'); openModal('signupModal'); });
 document.getElementById('switchToLogin').addEventListener('click', function () { closeModal('signupModal'); openModal('loginModal'); });
 document.getElementById('logoutBtn').addEventListener('click', function () {
-  setSession(null); closeModal('accountModal'); updateAuthUI(); toast('Você saiu da conta.', 'ℹ');
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    fetch('/api/auth-logout', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+    window.PRODUCTION_USER = null;
+  } else {
+    setSession(null);
+  }
+  closeModal('accountModal'); updateAuthUI(); toast('Você saiu da conta.', 'ℹ');
 });
 
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
   e.preventDefault();
   if (typeof isProductionMode === 'function' && isProductionMode()) {
-    document.getElementById('loginError').textContent = 'Modo produção: autenticação deve ser feita no backend.';
+    var productionLoginError = document.getElementById('loginError');
+    productionLoginError.textContent = 'Validando acesso...';
+    try {
+      var loginResponse = await fetch('/api/auth-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email: document.getElementById('loginEmail').value.trim().toLowerCase(), password: document.getElementById('loginPassword').value }) });
+      var loginResult = await loginResponse.json();
+      if (!loginResponse.ok || !loginResult.ok) { productionLoginError.textContent = loginResult.error || 'E-mail ou senha incorretos.'; return; }
+      window.PRODUCTION_USER = loginResult.user;
+      productionLoginError.textContent = '';
+      closeModal('loginModal'); e.target.reset(); updateAuthUI();
+      toast('Bem-vindo, ' + (loginResult.user.name || loginResult.user.email).split(' ')[0] + '!', '✦');
+    } catch (error) { productionLoginError.textContent = 'Serviço de autenticação indisponível.'; }
     return;
   }
   var email = document.getElementById('loginEmail').value.trim().toLowerCase();
@@ -811,7 +827,22 @@ document.getElementById('loginForm').addEventListener('submit', async function (
 document.getElementById('signupForm').addEventListener('submit', async function (e) {
   e.preventDefault();
   if (typeof isProductionMode === 'function' && isProductionMode()) {
-    document.getElementById('signupError').textContent = 'Modo produção: criação de conta deve ser feita no backend.';
+    var productionSignupError = document.getElementById('signupError');
+    var productionName = document.getElementById('signupName').value.trim();
+    var productionEmail = document.getElementById('signupEmail').value.trim().toLowerCase();
+    var productionPass = document.getElementById('signupPassword').value;
+    if (productionPass.length < 8) { productionSignupError.textContent = 'Senha deve ter pelo menos 8 caracteres.'; return; }
+    productionSignupError.textContent = 'Criando conta...';
+    try {
+      var signupResponse = await fetch('/api/auth-signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ name: productionName, email: productionEmail, password: productionPass }) });
+      var signupResult = await signupResponse.json();
+      if (!signupResponse.ok || !signupResult.ok) { productionSignupError.textContent = signupResult.error || 'Não foi possível criar a conta.'; return; }
+      if (signupResult.requiresEmailConfirmation) { productionSignupError.textContent = 'Verifique seu e-mail para ativar a conta.'; return; }
+      window.PRODUCTION_USER = signupResult.user;
+      productionSignupError.textContent = '';
+      closeModal('signupModal'); e.target.reset(); updateAuthUI();
+      toast('Conta criada. Bem-vindo!', '✦');
+    } catch (error) { productionSignupError.textContent = 'Serviço de autenticação indisponível.'; }
     return;
   }
   var name = document.getElementById('signupName').value.trim();
@@ -1225,8 +1256,18 @@ document.addEventListener('keydown', function (e) {
 /* ============================================================
    INIT
    ============================================================ */
-function init() {
+async function loadProductionUser() {
+  if (typeof isProductionMode !== 'function' || !isProductionMode()) return;
   try {
+    var response = await fetch('/api/auth-me', { credentials: 'same-origin' });
+    var result = await response.json();
+    window.PRODUCTION_USER = response.ok && result.ok ? result.user : null;
+  } catch (error) { window.PRODUCTION_USER = null; }
+}
+
+async function init() {
+  try {
+    await loadProductionUser();
     refreshPlanConfig();
     applyContentToSite();
     refreshFlatPlaylist();
