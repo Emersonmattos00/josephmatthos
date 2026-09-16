@@ -14,7 +14,6 @@ desktop.ini
 # NODE / DEPENDÊNCIAS
 # ============================================================
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 .npm/

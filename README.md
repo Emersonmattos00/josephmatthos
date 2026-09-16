@@ -33,7 +33,7 @@ com CMS embutido — todo o conteúdo é editável e salvo no navegador.
 - **Upload de áudios** (IndexedDB) ou URLs externas
 - **Gestão de usuários**: mudar plano, banir, excluir
 - **Backup/restauração** em JSON
-- **Login de admin separado** (padrão: `admin` / `admin123`)
+- **Login de admin separado** (primeiro acesso demo: `admin` / `admin123`)
 
 ---
 
@@ -138,6 +138,10 @@ local.
 │   ├── store.js            # Persistência (localStorage)
 │   ├── site.js             # Site público + player + prévias
 │   └── admin.js            # Painel administrativo
+├── api/
+│   ├── admin-login.js      # Login bcrypt no Vercel
+│   ├── admin-session.js    # Verificação de sessão
+│   └── admin-logout.js     # Encerramento de sessão
 ├── assets/
 │   └── img/
 │       ├── LEIA-ME.md      # Instruções das imagens
@@ -147,6 +151,8 @@ local.
 │       └── album-boom-boom-bap.jpg
 ├── .gitignore
 ├── README.md
+├── package.json
+├── package-lock.json
 └── vercel.json
 ```
 
@@ -158,7 +164,7 @@ local.
 
 1. Abra o site
 2. Pressione **Ctrl + Shift + A**
-3. Login: `admin` / `admin123`
+3. No primeiro acesso demo, use `admin` / `admin123` e troque a senha.
 4. Edite qualquer seção (Geral, Hero, Sobre, Discografia…)
 5. Clique em **💾 Salvar alterações**
 
@@ -231,7 +237,7 @@ Cada faixa aceita:
 
 1. Abra `index.html` (ou via servidor)
 2. Pressione **`Ctrl + Shift + A`**
-3. Use `admin` / `admin123`
+3. No modo demo, use `admin` / `admin123`; em produção, use as variáveis configuradas no Vercel.
 4. Explore as abas laterais
 
 **Dicas:**

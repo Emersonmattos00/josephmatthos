@@ -3,7 +3,7 @@
    Cache básico para offline + fallback offline.html
    ============================================================ */
 
-const CACHE_VERSION = 'jm-v1';
+const CACHE_VERSION = 'jm-v2';
 const CACHE_STATIC = [
   '/',
   '/index.html',
@@ -53,6 +53,10 @@ self.addEventListener('fetch', function (event) {
 
   var url = new URL(req.url);
   if (url.origin !== location.origin) return;
+
+  // Nunca armazena respostas de API: sessões, compras e dados do admin
+  // devem sempre ser consultados na rede e não podem ficar no cache offline.
+  if (url.pathname.indexOf('/api/') === 0) return;
 
   // Navegação (HTML)
   if (req.mode === 'navigate') {

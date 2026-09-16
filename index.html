@@ -629,23 +629,16 @@
      ============================================================ -->
 <script>
 (function () {
-  // 1) Se já está offline ao carregar, redireciona pra offline.html
-  if (!navigator.onLine) {
-    window.location.replace('/offline.html');
-    return;
-  }
-
-  // 2) Escuta mudanças de conexão
+  // O service worker entrega a versão cacheada quando a rede falha.
+  // Não redireciona durante o carregamento: isso impediria o offline-first.
   window.addEventListener('offline', function () {
-    // Aguarda 1.5s antes de redirecionar — dá chance de reconectar rápido
-    setTimeout(function () {
-      if (!navigator.onLine) {
-        window.location.replace('/offline.html');
-      }
-    }, 1500);
+    document.body.setAttribute('data-offline', 'true');
+  });
+  window.addEventListener('online', function () {
+    document.body.removeAttribute('data-offline');
   });
 
-  // 3) Registra Service Worker (se existir)
+  // Registra Service Worker (se existir)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js').catch(function (err) {

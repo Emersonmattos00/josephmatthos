@@ -11,6 +11,36 @@ function esc(s) {
   });
 }
 
+function sanitizeHtml(value) {
+  if (typeof DOMParser === 'undefined') return esc(value);
+  var allowedTags = { B: true, BR: true, EM: true, I: true, P: true, SMALL: true, SPAN: true, STRONG: true, U: true };
+  var doc = new DOMParser().parseFromString(String(value == null ? '' : value), 'text/html');
+  doc.body.querySelectorAll('*').forEach(function (node) {
+    if (!allowedTags[node.tagName]) {
+      node.replaceWith(document.createTextNode(node.textContent || ''));
+      return;
+    }
+    Array.from(node.attributes).forEach(function (attr) {
+      if (attr.name !== 'class') node.removeAttribute(attr.name);
+    });
+  });
+  return doc.body.innerHTML;
+}
+
+function safeExternalUrl(value) {
+  try {
+    var url = new URL(String(value || ''), window.location.href);
+    if (url.protocol === 'https:' || url.protocol === 'mailto:') return url.href;
+  } catch (e) {}
+  return '#';
+}
+
+function safeMediaUrl(value) {
+  var raw = String(value || '').trim();
+  if (/^(data:image\/(png|jpeg|jpg|webp);base64,|blob:|https?:|\/|\.\.\/|\.\/)/i.test(raw)) return raw;
+  return '';
+}
+
 /* ------------------------------------------------------------
    DEBOUNCE — atrasa execução até o usuário parar de chamar
    ------------------------------------------------------------ */

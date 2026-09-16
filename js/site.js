@@ -6,6 +6,7 @@ const _imageValidated = new Set();
 
 function applyImageSafe(el, url, cls, onFail) {
   if (!el) return;
+  url = safeMediaUrl(url);
   if (!url) { el.classList.remove(cls); el.style.backgroundImage = ''; if (onFail) onFail(); return; }
   if (_imageValidated.has(url)) {
     el.classList.add(cls); el.style.backgroundImage = 'url(' + url + ')'; return;
@@ -64,7 +65,7 @@ function applyContentToSite() {
     if (logoEl) logoEl.innerHTML = esc(CONTENT.branding.name) + ' <span>' + esc(CONTENT.branding.nameAccent) + '</span>';
 
     var footerEl = document.getElementById('footerText');
-    if (footerEl) footerEl.innerHTML = CONTENT.branding.footer;
+    if (footerEl) footerEl.innerHTML = sanitizeHtml(CONTENT.branding.footer);
 
     var a = CONTENT.aparencia;
     document.documentElement.style.setProperty('--bg', a.bg);
@@ -75,26 +76,27 @@ function applyContentToSite() {
     document.documentElement.style.setProperty('--font-serif', a.fontSerif);
     document.documentElement.style.setProperty('--font-sans', a.fontSans);
 
-    if (CONTENT.branding.bgImage) {
-      if (_imageValidated.has(CONTENT.branding.bgImage)) {
-        document.body.style.backgroundImage = 'linear-gradient(rgba(11,10,12,0.85), rgba(11,10,12,0.85)), url(' + CONTENT.branding.bgImage + ')';
+    var safeBgImage = safeMediaUrl(CONTENT.branding.bgImage);
+    if (safeBgImage) {
+      if (_imageValidated.has(safeBgImage)) {
+        document.body.style.backgroundImage = 'linear-gradient(rgba(11,10,12,0.85), rgba(11,10,12,0.85)), url(' + safeBgImage + ')';
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundAttachment = 'fixed';
       } else {
         var probe = new Image();
         probe.onload = function () {
-          _imageValidated.add(CONTENT.branding.bgImage);
-          document.body.style.backgroundImage = 'linear-gradient(rgba(11,10,12,0.85), rgba(11,10,12,0.85)), url(' + CONTENT.branding.bgImage + ')';
+          _imageValidated.add(safeBgImage);
+          document.body.style.backgroundImage = 'linear-gradient(rgba(11,10,12,0.85), rgba(11,10,12,0.85)), url(' + safeBgImage + ')';
           document.body.style.backgroundSize = 'cover';
           document.body.style.backgroundAttachment = 'fixed';
         };
         probe.onerror = function () { document.body.style.backgroundImage = ''; };
-        probe.src = CONTENT.branding.bgImage;
+        probe.src = safeBgImage;
       }
     } else { document.body.style.backgroundImage = ''; }
 
     var heroTitleEl = document.getElementById('heroTitle');
-    if (heroTitleEl) heroTitleEl.innerHTML = CONTENT.hero.title;
+    if (heroTitleEl) heroTitleEl.innerHTML = sanitizeHtml(CONTENT.hero.title);
     var heroSubEl = document.getElementById('heroSub');
     if (heroSubEl) heroSubEl.textContent = CONTENT.hero.subtitle;
     var bp = document.getElementById('heroBtnPrimary');
@@ -113,19 +115,19 @@ function applyContentToSite() {
     }
 
     var sobreTitleEl = document.getElementById('sobreTitle');
-    if (sobreTitleEl) sobreTitleEl.innerHTML = CONTENT.sobre.title;
+    if (sobreTitleEl) sobreTitleEl.innerHTML = sanitizeHtml(CONTENT.sobre.title);
     var sobreSubEl = document.getElementById('sobreSub');
     if (sobreSubEl) sobreSubEl.textContent = CONTENT.sobre.subtitle;
     applyImageSafe(document.getElementById('sobreImg'), CONTENT.sobre.image, 'has-img');
     var sobreTextEl = document.getElementById('sobreText');
     if (sobreTextEl) {
       var paragraphs = String(CONTENT.sobre.paragraphs).split('\n').filter(function (p) { return p.trim(); });
-      sobreTextEl.innerHTML = paragraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
+      sobreTextEl.innerHTML = paragraphs.map(function (p) { return '<p>' + sanitizeHtml(p) + '</p>'; }).join('') +
         (CONTENT.sobre.quote ? '<div class="quote">' + esc(CONTENT.sobre.quote) + '</div>' : '');
     }
 
     var filTitleEl = document.getElementById('filosofiaTitle');
-    if (filTitleEl) filTitleEl.innerHTML = CONTENT.filosofia.title;
+    if (filTitleEl) filTitleEl.innerHTML = sanitizeHtml(CONTENT.filosofia.title);
     var filSubEl = document.getElementById('filosofiaSub');
     if (filSubEl) filSubEl.textContent = CONTENT.filosofia.subtitle;
     var frasesGridEl = document.getElementById('frasesGrid');
@@ -136,7 +138,7 @@ function applyContentToSite() {
     }
 
     var discoTitleEl = document.getElementById('discoTitle');
-    if (discoTitleEl) discoTitleEl.innerHTML = CONTENT.discografia.title;
+    if (discoTitleEl) discoTitleEl.innerHTML = sanitizeHtml(CONTENT.discografia.title);
     var discoSubEl = document.getElementById('discoSub');
     if (discoSubEl) discoSubEl.textContent = CONTENT.discografia.subtitle;
 
@@ -145,7 +147,7 @@ function applyContentToSite() {
 
     var plansTitleEl = document.getElementById('plansModalTitle');
     var plansSubEl = document.getElementById('plansModalSub');
-    if (plansTitleEl) plansTitleEl.innerHTML = CONTENT.planos.title;
+    if (plansTitleEl) plansTitleEl.innerHTML = sanitizeHtml(CONTENT.planos.title);
     if (plansSubEl) plansSubEl.textContent = CONTENT.planos.subtitle;
 
     var plansGridEl = document.getElementById('plansGrid');
@@ -168,7 +170,7 @@ function applyContentToSite() {
     }
 
     var contatoTitleEl = document.getElementById('contatoTitle');
-    if (contatoTitleEl) contatoTitleEl.innerHTML = CONTENT.contato.title;
+    if (contatoTitleEl) contatoTitleEl.innerHTML = sanitizeHtml(CONTENT.contato.title);
     var contatoSubEl = document.getElementById('contatoSub');
     if (contatoSubEl) contatoSubEl.textContent = CONTENT.contato.subtitle;
     var contatoHeadingEl = document.getElementById('contatoHeading');
@@ -179,7 +181,7 @@ function applyContentToSite() {
     var socialLinksEl = document.getElementById('socialLinks');
     if (socialLinksEl) {
       socialLinksEl.innerHTML = CONTENT.contato.socials.map(function (s) {
-        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer" ' +
+        return '<a href="' + esc(safeExternalUrl(s.url)) + '" target="_blank" rel="noopener noreferrer" ' +
                'class="ad-social-icon ' + esc(s.icon) + '" ' +
                'data-label="' + esc(s.label) + '" ' +
                'aria-label="' + esc(s.label) + '">' +
