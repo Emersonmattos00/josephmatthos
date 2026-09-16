@@ -2,24 +2,7 @@
    ADMIN.JS — Painel administrativo completo
    Atalho: Ctrl + Shift + A
    Login padrão: admin / admin123
-   Reset: acesse ?resetAdmin=1 na URL
    ============================================================ */
-
-/* ============================================================
-   RESET DE EMERGÊNCIA — acesse ?resetAdmin=1 na URL
-   ============================================================ */
-(function checkAdminReset() {
-  try {
-    var params = new URLSearchParams(window.location.search);
-    if (params.get('resetAdmin') === '1') {
-      localStorage.removeItem('jm_admin_v2');
-      sessionStorage.removeItem('jm_admin_session_v2');
-      // Remove o parâmetro da URL pra não repetir
-      var url = window.location.pathname;
-      window.location.replace(url);
-    }
-  } catch (e) {}
-})();
 
 var adminTabTitles = {
   dashboard: 'Dashboard',
