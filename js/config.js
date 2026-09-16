@@ -94,7 +94,7 @@ const DEFAULT_CONTENT = {
     footer: "© 2026 Joseph Matthos. Todos os direitos reservados. ✦ Feito com poesia e beat.",
     metaTitle: "Joseph Matthos | Plataforma Oficial",
     metaDesc: "Rapper poético, filosófico e inspirador. Discografia completa, prévias gratuitas e loja de faixas individuais.",
-    bgImage: "assets/img/hero-bg.jpg"
+    bgImage: "assets/img/tema.png"
   },
 
   // ========================================
@@ -108,7 +108,7 @@ const DEFAULT_CONTENT = {
     btnSecondaryText: "Ver planos",
     btnSecondaryLink: "", // Vazio = abre modal de planos via JS
     vinylLyric: "\u201cNada acabou. Só estamos começando.\u201d", // Aspas tipográficas
-    vinylImage: "assets/img/boom-boom-bap-clean.jpg"
+    vinylImage: "assets/img/vinil.png"
   },
 
   // ========================================
@@ -119,7 +119,7 @@ const DEFAULT_CONTENT = {
     subtitle: "Entre a poesia concreta e o rap de reflexão, uma voz que incomoda e cura.",
     paragraphs: "<strong>Joseph Matthos</strong> não é apenas um rapper. É um cronista do invisível, um filósofo de esquina, um poeta que encontrou no beat a cadência perfeita para suas inquietações.\nNascido na periferia e formado nas ruas, Joseph transforma vivências cruas em letras que equilibram profundidade e acessibilidade.\nCom influências que vão de <strong>Racionais MC's</strong> a <strong>Fernando Pessoa</strong>, ele constrói pontes entre o sagrado e o cotidiano. Em <strong>Boom, Boom, Bàp</strong> (2026), palavras viram rumor, rumor vira verdade e verdade vira legado.",
     quote: "\u201cMinha rima é a filha da noite que pariu o dia.\u201d",
-    image: "assets/img/joseph-sobre.jpg"
+    image: "assets/img/josephmatthos.png"
   },
 
   // ========================================

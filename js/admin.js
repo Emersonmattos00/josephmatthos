@@ -294,7 +294,7 @@ function updateBgPreview() {
   var el = document.getElementById('bgPreview');
   if (!el) return;
   if (CONTENT.branding.bgImage) {
-    el.style.backgroundImage = 'url(' + CONTENT.branding.bgImage + ')';
+    el.style.backgroundImage = 'url(' + safeMediaUrl(CONTENT.branding.bgImage) + ')';
     el.textContent = '';
   } else {
     el.style.backgroundImage = '';
@@ -305,7 +305,7 @@ function updateVinylPreview() {
   var el = document.getElementById('vinylPreview');
   if (!el) return;
   if (CONTENT.hero.vinylImage) {
-    el.style.backgroundImage = 'url(' + CONTENT.hero.vinylImage + ')';
+    el.style.backgroundImage = 'url(' + safeMediaUrl(CONTENT.hero.vinylImage) + ')';
     el.textContent = '';
   } else {
     el.style.backgroundImage = '';
@@ -316,7 +316,7 @@ function updateSobrePreview() {
   var el = document.getElementById('sobrePreview');
   if (!el) return;
   if (CONTENT.sobre.image) {
-    el.style.backgroundImage = 'url(' + CONTENT.sobre.image + ')';
+    el.style.backgroundImage = 'url(' + safeMediaUrl(CONTENT.sobre.image) + ')';
     el.textContent = '';
   } else {
     el.style.backgroundImage = '';
@@ -937,7 +937,10 @@ function renderSales() {
    ============================================================ */
 var adminSaveBtn = document.getElementById('adminSaveBtn');
 if (adminSaveBtn) {
-  adminSaveBtn.addEventListener('click', function () { saveContent(); toast('Alterações salvas.', '💾'); });
+  adminSaveBtn.addEventListener('click', function () {
+    var saved = saveContent();
+    toast(saved ? 'Alterações salvas neste navegador.' : 'Não foi possível salvar as alterações.', saved ? '💾' : '⚠');
+  });
 }
 var adminResetBtn = document.getElementById('adminResetBtn');
 if (adminResetBtn) {

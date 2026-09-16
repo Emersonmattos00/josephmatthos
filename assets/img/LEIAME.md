@@ -10,9 +10,9 @@ e avisa no console do navegador.
 
 | Arquivo | Onde aparece | Dimensões ideais | Formato |
 |---------|--------------|------------------|---------|
-| `joseph-sobre.jpg` | Seção **Sobre** (retrato vertical) | 800 × 1067 px (3:4) | JPG / WebP |
-| `hero-bg.jpg` | Fundo geral do site (banner panorâmico) | 1920 × 1080 px (16:9) | JPG / WebP |
-| `boom-boom-bap-clean.jpg` | Vinil giratório da hero | 1000 × 1000 px (quadrada) | JPG / WebP |
+| `josephmatthos.png` | Seção **Sobre** (retrato vertical) | 800 × 1067 px (3:4) | PNG / WebP |
+| `tema.png` | Fundo geral do site (banner panorâmico) | 1920 × 1080 px (16:9) | PNG / WebP |
+| `vinil.png` | Vinil giratório da hero | 1000 × 1000 px (quadrada) | PNG / WebP |
 | `album-boom-boom-bap.jpg` | Capa do álbum na discografia + `og:image` | 1000 × 1000 px (quadrada) | JPG / WebP |
 
 ---
@@ -45,13 +45,13 @@ e avisa no console do navegador.
 
 ```js
 branding: {
-  bgImage: "assets/img/hero-bg.jpg"           // fundo geral
+  bgImage: "assets/img/tema.png"              // fundo geral
 },
 hero: {
-  vinylImage: "assets/img/boom-boom-bap-clean.jpg"  // vinil
+  vinylImage: "assets/img/vinil.png"                 // vinil
 },
 sobre: {
-  image: "assets/img/joseph-sobre.jpg"        // retrato
+  image: "assets/img/josephmatthos.png"       // retrato
 }
 ```
 

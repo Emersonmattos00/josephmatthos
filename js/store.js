@@ -29,7 +29,7 @@ const Store = (() => {
     DEBUG: 'jm_debug'
   };
 
-  const CURRENT_SCHEMA_VERSION = 5;
+  const CURRENT_SCHEMA_VERSION = 6;
   const MAX_STORAGE_SIZE = 5 * 1024 * 1024; // 5MB
   const STORAGE_WARNING_THRESHOLD = 0.9; // 90%
 
@@ -293,6 +293,9 @@ const Store = (() => {
     
     if (success) {
       content = normalizedContent;
+      if (typeof window !== 'undefined') {
+        window.CONTENT = content;
+      }
       log('Conteúdo salvo com sucesso');
     }
     
@@ -438,6 +441,14 @@ const Store = (() => {
           migrated.loja.showTaxInfo = false;
         }
       }
+    }
+
+    // Migração da v5 para v6: atualiza somente os caminhos padrão antigos.
+    // Imagens personalizadas salvas pelo admin são preservadas.
+    if (fromVersion < 6) {
+      if (migrated.branding?.bgImage === 'assets/img/hero-bg.jpg') migrated.branding.bgImage = 'assets/img/tema.png';
+      if (migrated.hero?.vinylImage === 'assets/img/boom-boom-bap-clean.jpg') migrated.hero.vinylImage = 'assets/img/vinil.png';
+      if (migrated.sobre?.image === 'assets/img/joseph-sobre.jpg') migrated.sobre.image = 'assets/img/josephmatthos.png';
     }
     
     // Atualiza versão
