@@ -38,6 +38,42 @@ const Store = (() => {
   // ========================================
   let content = null;
   let isDebugMode = false;
+  let appMode = 'demo';
+
+  function setAppMode(mode) {
+    const nextMode = (typeof mode === 'string' && mode.trim()) ? mode.trim().toLowerCase() : 'demo';
+    appMode = nextMode;
+    if (typeof window !== 'undefined') {
+      window.APP_MODE = nextMode;
+    }
+    log(`Modo de app definido: ${nextMode}`);
+    return nextMode;
+  }
+
+  function getAppMode() {
+    return appMode;
+  }
+
+  function isProductionMode() {
+    return getAppMode() === 'production';
+  }
+
+  function normalizeContent(rawContent) {
+    const fallback = getDefaultContent();
+    if (!rawContent || typeof rawContent !== 'object') {
+      return fallback;
+    }
+    return deepMerge(fallback, rawContent);
+  }
+
+  function updateContent(mutator) {
+    const current = normalizeContent(getContent());
+    const nextValue = typeof mutator === 'function' ? mutator(current) : mutator;
+    const safeValue = normalizeContent(nextValue);
+    setContent(safeValue);
+    saveContent();
+    return safeValue;
+  }
 
   // ========================================
   // UTILITÁRIOS DE STORAGE
@@ -213,11 +249,11 @@ const Store = (() => {
       if (storedVersion < CURRENT_SCHEMA_VERSION) {
         log(`Migrando conteúdo da v${storedVersion} para v${CURRENT_SCHEMA_VERSION}`);
         const migrated = migrateContent(stored, storedVersion);
-        return migrated;
+        return normalizeContent(migrated);
       }
       
       // Merge com padrão para garantir campos novos
-      const merged = deepMerge(getDefaultContent(), stored);
+      const merged = normalizeContent(stored);
       
       // Validação de integridade
       if (typeof validateContent === 'function') {
@@ -244,16 +280,19 @@ const Store = (() => {
       return false;
     }
 
-    // Atualiza metadata
-    if (!content._metadata) {
-      content._metadata = {};
-    }
-    content._metadata.version = CURRENT_SCHEMA_VERSION;
-    content._metadata.updatedAt = new Date().toISOString();
+    const normalizedContent = normalizeContent(content);
 
-    const success = writeStorage(STORAGE_KEYS.CONTENT, content);
+    // Atualiza metadata
+    if (!normalizedContent._metadata) {
+      normalizedContent._metadata = {};
+    }
+    normalizedContent._metadata.version = CURRENT_SCHEMA_VERSION;
+    normalizedContent._metadata.updatedAt = new Date().toISOString();
+
+    const success = writeStorage(STORAGE_KEYS.CONTENT, normalizedContent);
     
     if (success) {
+      content = normalizedContent;
       log('Conteúdo salvo com sucesso');
     }
     
@@ -264,13 +303,16 @@ const Store = (() => {
    * Define novo conteúdo
    */
   function setContent(newContent) {
-    if (!newContent || typeof newContent !== 'object') {
+    const safeContent = normalizeContent(newContent);
+    if (!safeContent || typeof safeContent !== 'object') {
       logError('Conteúdo inválido');
       return false;
     }
     
-    content = newContent;
-    window.CONTENT = content; // Compatibilidade
+    content = safeContent;
+    if (typeof window !== 'undefined') {
+      window.CONTENT = content; // Compatibilidade
+    }
     return true;
   }
 
@@ -280,7 +322,9 @@ const Store = (() => {
   function getContent() {
     if (!content) {
       content = loadContent();
-      window.CONTENT = content;
+      if (typeof window !== 'undefined') {
+        window.CONTENT = content;
+      }
     }
     return content;
   }
@@ -443,8 +487,18 @@ const Store = (() => {
   async function getAdminCreds() {
     try {
       const creds = readStorage(STORAGE_KEYS.ADMIN);
-      if (creds && creds.user && creds.passHash) {
-        return creds;
+      if (creds && creds.user) {
+        if (creds.passHash) {
+          if (typeof creds.passHash === 'string' && !creds.passHash.startsWith('sha256:') && !creds.passHash.startsWith('h')) {
+            const migrated = {
+              user: creds.user,
+              passHash: typeof hashStr === 'function' ? await hashStr(creds.passHash) : creds.passHash
+            };
+            writeStorage(STORAGE_KEYS.ADMIN, migrated);
+            return migrated;
+          }
+          return creds;
+        }
       }
     } catch (error) {
       logError('Erro ao ler credenciais:', error);
@@ -506,10 +560,18 @@ const Store = (() => {
   }
 
   function getSession() {
+    if (isProductionMode()) {
+      log('Sessão de usuário bloqueada em produção: backend deve gerenciar a sessão.');
+      return null;
+    }
     return readStorage(STORAGE_KEYS.SESSION, null);
   }
 
   function setSession(session) {
+    if (isProductionMode()) {
+      log('Tentativa de gravar sessão em produção bloqueada.');
+      return false;
+    }
     if (session) {
       return writeStorage(STORAGE_KEYS.SESSION, session);
     } else {
@@ -877,10 +939,18 @@ const Store = (() => {
   // ========================================
   
   function getAdminSession() {
+    if (isProductionMode()) {
+      log('Sessão de admin bloqueada em produção: backend deve gerenciar a sessão.');
+      return null;
+    }
     return readStorage(STORAGE_KEYS.ADMIN_SESSION, null);
   }
 
   function setAdminSession(session) {
+    if (isProductionMode()) {
+      log('Tentativa de gravar sessão de admin em produção bloqueada.');
+      return false;
+    }
     if (session) {
       return writeStorage(STORAGE_KEYS.ADMIN_SESSION, session);
     } else {
@@ -972,11 +1042,17 @@ const Store = (() => {
   function init() {
     try {
       initDebugMode();
+      if (typeof window !== 'undefined') {
+        setAppMode(window.APP_MODE || appMode);
+      }
       log('Store inicializado');
       
       // Carrega conteúdo
       content = loadContent();
-      window.CONTENT = content;
+      if (typeof window !== 'undefined') {
+        window.CONTENT = content;
+        window.APP_MODE = appMode;
+      }
       
       log(`Conteúdo carregado: v${content?._metadata?.version || 'unknown'}`);
       
@@ -994,6 +1070,9 @@ const Store = (() => {
   return {
     // Inicialização
     init,
+    setAppMode,
+    getAppMode,
+    isProductionMode,
     
     // Content
     getContent,
@@ -1001,6 +1080,8 @@ const Store = (() => {
     saveContent,
     loadContent,
     getDefaultContent,
+    normalizeContent,
+    updateContent,
     
     // Admin
     getAdminCreds,
@@ -1062,9 +1143,15 @@ const Store = (() => {
 // ========================================
 
 // Mantém compatibilidade com código existente
-window.CONTENT = Store.getContent();
+if (typeof window !== 'undefined') {
+  window.APP_MODE = Store.getAppMode();
+  window.CONTENT = Store.getContent();
+}
 
 // Funções globais (legacy)
+window.setAppMode = Store.setAppMode;
+window.getAppMode = Store.getAppMode;
+window.isProductionMode = Store.isProductionMode;
 window.getUsers = Store.getUsers;
 window.saveUsers = Store.saveUsers;
 window.getSession = Store.getSession;

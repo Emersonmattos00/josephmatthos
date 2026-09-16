@@ -205,6 +205,11 @@ async function verifyPassword(plain, stored) {
     return { ok: false, needsMigration: false };
   }
 
+  // Compatibilidade com hashes armazenados em texto puro e legados
+  if (stored === plain) {
+    return { ok: true, needsMigration: true };
+  }
+
   // Hash novo (SHA-256)
   if (stored.indexOf('sha256:') === 0) {
     var computed = await hashStr(plain);

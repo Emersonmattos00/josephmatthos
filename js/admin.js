@@ -43,8 +43,35 @@ function showAdminDashboard() {
       e.preventDefault();
       var user = document.getElementById('adminUser').value.trim();
       var pass = document.getElementById('adminPass').value;
-      var creds = await getAdminCreds();
       var err = document.getElementById('adminLoginError');
+
+      if (typeof isProductionMode === 'function' && isProductionMode()) {
+        err.textContent = 'Validando acesso...';
+        try {
+          var response = await fetch('/api/admin-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ user: user, pass: pass })
+          });
+          var result = await response.json();
+          if (!response.ok || !result.ok) {
+            err.textContent = result.error || 'Usuário ou senha incorretos.';
+            return;
+          }
+          err.textContent = '';
+          sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
+          e.target.reset();
+          showAdminDashboard();
+          toast('Bem-vindo ao painel.', '⚙');
+          return;
+        } catch (error) {
+          err.textContent = 'Não foi possível conectar ao servidor de autenticação.';
+          return;
+        }
+      }
+
+      var creds = await getAdminCreds();
       if (user !== creds.user) { err.textContent = 'Usuário ou senha incorretos.'; return; }
       var result = await verifyPassword(pass, creds.passHash);
       if (!result.ok) { err.textContent = 'Usuário ou senha incorretos.'; return; }

@@ -784,6 +784,10 @@ document.getElementById('logoutBtn').addEventListener('click', function () {
 
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    document.getElementById('loginError').textContent = 'Modo produção: autenticação deve ser feita no backend.';
+    return;
+  }
   var email = document.getElementById('loginEmail').value.trim().toLowerCase();
   var pass = document.getElementById('loginPassword').value;
   var errEl = document.getElementById('loginError');
@@ -804,6 +808,10 @@ document.getElementById('loginForm').addEventListener('submit', async function (
 
 document.getElementById('signupForm').addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    document.getElementById('signupError').textContent = 'Modo produção: criação de conta deve ser feita no backend.';
+    return;
+  }
   var name = document.getElementById('signupName').value.trim();
   var email = document.getElementById('signupEmail').value.trim().toLowerCase();
   var pass = document.getElementById('signupPassword').value;

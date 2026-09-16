@@ -71,6 +71,24 @@ O `vercel.json` já configura:
 - Headers de segurança (HSTS, CSP, X-Frame-Options, Permissions-Policy)
 - Cache otimizado para `/assets/`, `/css/` e `/js/`
 
+### Configurar autenticação do admin no Vercel
+
+Em produção, o login usa a função `/api/admin-login` e não lê credenciais do
+navegador. Configure estas variáveis no projeto Vercel:
+
+```bash
+vercel env add ADMIN_USER production
+vercel env add ADMIN_PASSWORD_HASH production
+```
+
+Gere o hash bcrypt localmente antes de cadastrar a senha:
+
+```bash
+node -e "require('bcryptjs').hash('uma-senha-forte', 12).then(console.log)"
+```
+
+O modo demo continua disponível em `localhost`, usando `admin` / `admin123`.
+
 ---
 
 ## 🗂 Estrutura de arquivos
