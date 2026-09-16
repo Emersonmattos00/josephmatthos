@@ -899,6 +899,10 @@ function refreshPlanConfig() {
 }
 var selectedPlan = 'premium';
 function openSubscribeModal(planId) {
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    toast('Pagamentos reais ainda não estão configurados.', '⚠');
+    return;
+  }
   if (!currentUser()) { toast('Crie uma conta para assinar.', 'ℹ'); openModal('signupModal'); return; }
   selectedPlan = planId;
   var cfg = planConfig[planId] || { name: planId, desc: '', price: '', suffix: '' };
@@ -921,6 +925,10 @@ document.getElementById('cardExp').addEventListener('input', function (e) {
 document.getElementById('subscribeForm').addEventListener('submit', function (e) {
   e.preventDefault();
   var err = document.getElementById('subscribeError');
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    err.textContent = 'Pagamentos reais ainda não estão configurados neste site.';
+    return;
+  }
   var num = document.getElementById('cardNumber').value.replace(/\s/g, '');
   if (num.length < 13 || num.length > 19) { err.textContent = 'Número de cartão inválido.'; return; }
   if (!luhnCheck(num)) { err.textContent = 'Número de cartão inválido (falha Luhn).'; return; }
@@ -1064,6 +1072,10 @@ document.addEventListener('input', function (e) {
 document.getElementById('checkoutForm').addEventListener('submit', function (e) {
   e.preventDefault();
   var err = document.getElementById('checkoutError');
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    err.textContent = 'Pagamentos reais ainda não estão configurados neste site.';
+    return;
+  }
   var name = document.getElementById('buyerName').value.trim();
   var email = document.getElementById('buyerEmail').value.trim().toLowerCase();
   var cardNum = document.getElementById('buyCardNumber').value.replace(/\s/g, '');

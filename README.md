@@ -8,6 +8,11 @@ com CMS embutido — todo o conteúdo é editável e salvo no navegador.
 > `localStorage` + `IndexedDB`. Para produção real: backend + banco de dados +
 > gateway de pagamento (Stripe / Mercado Pago / Pagar.me).
 
+> **Estado atual:** o login do painel administrativo já valida a senha no
+> backend Vercel com bcrypt. Cadastro/login de usuários, assinaturas, compras e
+> uploads de áudio ainda precisam de banco, gateway e storage externos antes de
+> serem habilitados em produção.
+
 ---
 
 ## ✨ Funcionalidades
@@ -88,6 +93,23 @@ node -e "require('bcryptjs').hash('uma-senha-forte', 12).then(console.log)"
 ```
 
 O modo demo continua disponível em `localhost`, usando `admin` / `admin123`.
+
+### Próxima arquitetura de produção
+
+Para transformar o protótipo em plataforma multiusuário, a recomendação é
+usar Supabase (Auth + PostgreSQL + Storage) ou serviços equivalentes:
+
+| Recurso | Implementação necessária |
+|---------|--------------------------|
+| Cadastro e login | API de autenticação com sessão em cookie `HttpOnly` |
+| Usuários e planos | Banco de dados; nunca `localStorage` |
+| Assinaturas e compras | Stripe, Mercado Pago ou Pagar.me com webhooks |
+| Áudios | Storage privado com URLs assinadas e expiração |
+| CMS admin | API autorizada por função/role, com auditoria |
+
+Enquanto essas integrações não forem configuradas, o site bloqueia pagamentos
+simulados em domínios publicados e mantém esses recursos apenas no modo demo
+local.
 
 ---
 
