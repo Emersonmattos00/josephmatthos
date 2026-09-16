@@ -1443,6 +1443,13 @@ nav .nav-cart.pop { animation: navCartPop 0.35s ease; }
 .playlist-play { margin-left: auto; color: var(--accent); font-size: 1.1rem; }
 .playlist-track-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }
 .playlist-track-row:last-child { border-bottom: 0; }
+.track-actions { display: flex; align-items: center; gap: 0.35rem; }
+.track-action-icon { position: relative; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 50%; cursor: pointer; font-size: 0.9rem; }
+.track-action-icon:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+.track-action-icon::after { position: absolute; right: 0; bottom: calc(100% + 0.45rem); z-index: 20; width: max-content; max-width: 180px; padding: 0.35rem 0.5rem; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; content: attr(data-tooltip); font-size: 0.65rem; opacity: 0; pointer-events: none; transform: translateY(3px); transition: 0.15s; }
+.track-action-icon:hover::after, .track-action-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
+.track-action-icon.in-cart { color: var(--success); cursor: default; }
+.track-owned-label { color: var(--success); font-size: 0.75rem; }
 .playlist-track-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }
 .playlist-track-row:last-child { border-bottom: 0; }
 .album-actions { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; }

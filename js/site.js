@@ -320,26 +320,14 @@ function renderDiscographyCard(album, track, trackIndex) {
   var coverStyle = album.coverImage ? 'style="background-image:url(' + esc(album.coverImage) + ')"' : '';
   var coverText = album.coverImage ? '' : esc(album.cover || '♪');
 
-  var btnClass = 'discography-track-btn';
-  var btnText = 'Adicionar';
-  var btnDisabled = '';
-  var btnOnclick = '';
-
+  var actionButtons = '';
   if (owns) {
-    btnClass += ' owned';
-    btnText = '✓ Comprada';
-    btnDisabled = 'disabled';
+    actionButtons = '<span class="track-owned-label">✓ Comprada</span>';
   } else if (inCart) {
-    btnClass += ' in-cart';
-    btnText = 'No carrinho';
-    btnDisabled = 'disabled';
-  } else if (!forSale) {
-    btnClass += ' locked';
-    btnText = 'Só Premium';
-    btnDisabled = 'disabled';
-  } else {
-    // ✅ CORREÇÃO: usa data-action + event delegation em vez de apenas onclick
-    btnOnclick = 'onclick="event.stopPropagation(); handleShopBuy(\'' + esc(album.id) + '\',' + trackIndex + ')"';
+    actionButtons = '<button class="track-action-icon in-cart" type="button" data-tooltip="No carrinho" aria-label="No carrinho" disabled>✓</button>';
+  } else if (forSale) {
+    actionButtons = '<button class="track-action-icon rent" type="button" data-tooltip="Alugar 48h" aria-label="Alugar por 48 horas" onclick="event.stopPropagation(); handleRentTrack(\'' + esc(album.id) + '\',' + trackIndex + ')">⌛</button>' +
+      '<button class="track-action-icon buy" type="button" data-tooltip="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onclick="event.stopPropagation(); handleShopBuy(\'' + esc(album.id) + '\',' + trackIndex + ')">🛒</button>';
   }
 
   var priceHTML = '';
@@ -363,7 +351,7 @@ function renderDiscographyCard(album, track, trackIndex) {
       '</div>' +
       '<div class="discography-track-footer">' +
         priceHTML +
-        '<button class="' + btnClass + '" ' + btnDisabled + ' ' + btnOnclick + ' data-action="add-to-cart" data-album-id="' + esc(album.id) + '" data-track-index="' + trackIndex + '">' + btnText + '</button>' +
+        '<div class="track-actions">' + actionButtons + '</div>' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -394,8 +382,17 @@ function isRentedTrack(albumId, trackIndex) {
 }
 
 function handleRentTrack(albumId, trackIndex) {
-  if (isProductionMode()) { toast('Aluguel real será liberado após a integração de pagamento.', '⚠'); return; }
   if (!currentUser()) { toast('Entre na sua conta para alugar a faixa.', 'ℹ'); openModal('loginModal'); return; }
+  var album = CONTENT.discografia.albums.find(function (item) { return item.id === albumId; });
+  var track = album && album.tracks[trackIndex];
+  if (!track) return;
+  if (isProductionMode()) {
+    fetch('/api/payments-rental', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ albumId: albumId, trackIndex: trackIndex, title: track.title, amount: parseFloat(track.rentalPrice) || parseFloat(track.price) || parseFloat(CONTENT.loja.defaultPrice) || 4.90 }) })
+      .then(function (response) { return response.json().then(function (result) { return { response: response, result: result }; }); })
+      .then(function (data) { if (!data.response.ok || !data.result.ok) { toast(data.result.error || 'Não foi possível iniciar o aluguel.', '⚠'); return; } window.location.assign(data.result.checkoutUrl); })
+      .catch(function () { toast('Gateway de pagamento indisponível.', '⚠'); });
+    return;
+  }
   try {
     var rentals = JSON.parse(localStorage.getItem('jm_rentals') || '{}');
     rentals[currentUser().id + ':' + albumId + ':' + trackIndex] = Date.now() + 48 * 60 * 60 * 1000;
