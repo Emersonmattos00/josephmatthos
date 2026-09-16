@@ -1465,6 +1465,12 @@ nav .nav-cart.pop { animation: navCartPop 0.35s ease; }
 #discographyContainer.view-list .discography-track-meta { justify-content: flex-start; }
 #discographyContainer.view-list .discography-track-footer { justify-content: flex-end; gap: 0.75rem; }
 #discographyContainer.view-list .discography-track-price small { display: none; }
+#discographyContainer[data-view-mode="list"] .discography-scroll { display: flex; flex-direction: column; gap: 0.5rem; }
+#discographyContainer[data-view-mode="list"] .discography-scroll { counter-reset: track-row; }
+#discographyContainer[data-view-mode="list"] .discography-track-card { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; }
+#discographyContainer[data-view-mode="list"] .discography-track-card::before { counter-increment: track-row; content: counter(track-row); }
+#discographyContainer[data-view-mode="list"] .discography-track-cover { display: none; }
+#discographyContainer[data-view-mode="list"] .discography-track-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; }
 @media (max-width: 600px) {
   .view-mode-buttons { margin-left: 0; }
   #discographyContainer.view-list .discography-track-card { grid-template-columns: 28px minmax(0, 1fr); }

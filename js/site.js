@@ -268,6 +268,7 @@ function renderDiscography() {
   }
 
   container.classList.toggle('view-list', discographyViewMode === 'list');
+  container.dataset.viewMode = discographyViewMode;
   container.innerHTML = html;
   updatePlayingHighlight();
 }
