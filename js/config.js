@@ -31,6 +31,7 @@
  * @property {string} duration - Duração formatada (ex: "3:58")
  * @property {number} price - Preço em R$ (ex: 4.90)
  * @property {boolean} forSale - Se pode ser vendida individualmente
+ * @property {{time: number, text: string}[]} lyrics - Letras sincronizadas
  */
 
 /**
@@ -322,6 +323,16 @@ const DEFAULT_CONTENT = {
       }
     ]
   },
+
+  playlists: [
+    {
+      id: "playlist-inicio",
+      title: "O começo",
+      description: "Uma seleção para entrar no universo de Joseph.",
+      cover: "JM",
+      tracks: ["album-bbb:0", "album-bbb:1", "album-1:0"]
+    }
+  ],
 
   // ========================================
   // LOJA — Configurações de venda de faixas

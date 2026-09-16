@@ -103,6 +103,10 @@
       </div>
 
       <div id="discographyContainer"></div>
+      <div class="playlists-panel" id="playlistsPanel" aria-labelledby="playlistsTitle">
+        <div class="playlists-heading"><div><h3 id="playlistsTitle">Playlists</h3><p>Seleções criadas para ouvir em sequência.</p></div></div>
+        <div class="playlists-grid" id="playlistsGrid"></div>
+      </div>
     </div>
   </section>
 
@@ -180,6 +184,7 @@
     </div>
     <div class="player-right">
       <button class="ctrl download-btn" id="downloadBtn" title="Baixar faixa (Premium)" aria-label="Baixar faixa">⬇</button>
+      <button class="ctrl" id="lyricsBtn" title="Abrir letras" aria-label="Abrir letras">♫</button>
       <div class="volume-wrap">
         <button class="ctrl" id="muteBtn" title="Mudo" aria-label="Ativar ou desativar som">🔊</button>
         <div class="volume-bar" id="volumeBar" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80" tabindex="0"><div class="volume-fill" id="volumeFill"></div></div>
@@ -187,6 +192,11 @@
     </div>
   </div>
   <audio id="audio" preload="metadata"></audio>
+
+  <div class="lyrics-drawer" id="lyricsDrawer" aria-live="polite" aria-label="Letra sincronizada">
+    <div class="lyrics-drawer-head"><div><span class="now-label">LETRA</span><h2 id="lyricsTitle">Nenhuma faixa tocando</h2></div><button class="modal-close" id="closeLyrics" aria-label="Fechar letras">×</button></div>
+    <div id="lyricsContent" class="lyrics-content"><p class="lyrics-empty">Toque uma faixa com letra cadastrada.</p></div>
+  </div>
 
   <!-- MODAIS -->
   <div class="modal-overlay" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
@@ -478,6 +488,12 @@
           <h3>Álbuns / EPs / Singles</h3>
           <div id="albumsEditor"></div>
           <button class="btn btn-primary btn-sm" id="addAlbumBtn" style="margin-top:1rem;">+ Adicionar álbum/EP/single</button>
+        </div>
+        <div class="admin-card">
+          <h3>Playlists</h3>
+          <p class="hint">Use referências no formato <code>id-do-album:índice-da-faixa</code>, separadas por vírgula.</p>
+          <div id="playlistsEditor"></div>
+          <button class="btn btn-outline btn-sm" id="addPlaylistBtn" style="margin-top:1rem;">+ Criar playlist</button>
         </div>
       </div>
 

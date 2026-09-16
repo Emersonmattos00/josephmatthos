@@ -3,7 +3,7 @@
    Cache básico para offline + fallback offline.html
    ============================================================ */
 
-const CACHE_VERSION = 'jm-v3';
+const CACHE_VERSION = 'jm-v4';
 const CACHE_STATIC = [
   '/',
   '/index.html',

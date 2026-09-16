@@ -269,6 +269,7 @@ function loadAllAdminFields() {
   updateSobrePreview();
   renderFrasesEditor();
   renderAlbumsEditor();
+  renderPlaylistsEditor();
   renderPlansEditor();
   renderSocialEditor();
 }
@@ -454,6 +455,50 @@ function renderAlbumsEditor() {
     '</div>';
   }).join('');
 }
+
+function lyricsToText(lyrics) {
+  return (Array.isArray(lyrics) ? lyrics : []).map(function (line) {
+    var seconds = Number(line.time) || 0;
+    var minutes = Math.floor(seconds / 60);
+    var rest = Math.floor(seconds % 60);
+    return minutes + ':' + String(rest).padStart(2, '0') + '|' + String(line.text || '');
+  }).join('\n');
+}
+
+function textToLyrics(value) {
+  return String(value || '').split('\n').map(function (line) {
+    var parts = line.split('|');
+    if (parts.length < 2) return null;
+    var stamp = parts.shift().trim().split(':');
+    var time = stamp.length === 2 ? Number(stamp[0]) * 60 + Number(stamp[1]) : Number(stamp[0]);
+    var text = parts.join('|').trim();
+    return Number.isFinite(time) && time >= 0 && text ? { time: time, text: text } : null;
+  }).filter(Boolean).sort(function (a, b) { return a.time - b.time; });
+}
+
+function renderPlaylistsEditor() {
+  var wrap = document.getElementById('playlistsEditor');
+  if (!wrap) return;
+  CONTENT.playlists = Array.isArray(CONTENT.playlists) ? CONTENT.playlists : [];
+  wrap.innerHTML = CONTENT.playlists.map(function (playlist, index) {
+    return '<div class="track-editor playlist-editor">' +
+      '<div class="track-head"><strong>' + esc(playlist.title || 'Playlist') + '</strong><button class="btn btn-ghost btn-sm" onclick="removePlaylist(' + index + ')">🗑</button></div>' +
+      '<div class="form-row"><div class="form-group"><label>Nome</label><input value="' + esc(playlist.title || '') + '" oninput="updatePlaylist(' + index + ',\'title\',this.value)"></div>' +
+      '<div class="form-group"><label>Capa/fallback</label><input maxlength="3" value="' + esc(playlist.cover || '♪') + '" oninput="updatePlaylist(' + index + ',\'cover\',this.value)"></div></div>' +
+      '<div class="form-group"><label>Descrição</label><input value="' + esc(playlist.description || '') + '" oninput="updatePlaylist(' + index + ',\'description\',this.value)"></div>' +
+      '<div class="form-group"><label>Faixas</label><input value="' + esc((playlist.tracks || []).join(', ')) + '" placeholder="album-bbb:0, album-bbb:1" oninput="updatePlaylistTracks(' + index + ',this.value)"></div>' +
+      '</div>';
+  }).join('') || '<p class="hint">Nenhuma playlist criada.</p>';
+}
+window.updatePlaylist = function (index, key, value) { CONTENT.playlists[index][key] = value; applyContentToSite(); };
+window.updatePlaylistTracks = function (index, value) { CONTENT.playlists[index].tracks = String(value).split(',').map(function (x) { return x.trim(); }).filter(Boolean); applyContentToSite(); };
+window.removePlaylist = function (index) { CONTENT.playlists.splice(index, 1); renderPlaylistsEditor(); applyContentToSite(); saveContent(); };
+var addPlaylistBtn = document.getElementById('addPlaylistBtn');
+if (addPlaylistBtn) addPlaylistBtn.addEventListener('click', function () {
+  CONTENT.playlists.push({ id: generateId('playlist'), title: 'Nova playlist', description: '', cover: '♪', tracks: [] });
+  renderPlaylistsEditor();
+  saveContent();
+});
 window.removeAlbum = function (i) {
   if (!confirm('Remover este álbum e todas as faixas? Áudios enviados também serão apagados.')) return;
   CONTENT.discografia.albums[i].tracks.forEach(cleanupTrackAudio);
@@ -517,6 +562,7 @@ function openAlbumModal(index) {
           '<div class="form-group"><label>Título</label><input type="text" value="' + esc(t.title) + '" oninput="updateAlbumTrack(' + ti + ',\'title\',this.value)"></div>' +
           '<div class="form-group"><label>Duração (ex: 4:32)</label><input type="text" value="' + esc(t.duration || '') + '" oninput="updateAlbumTrack(' + ti + ',\'duration\',this.value)"></div>' +
         '</div>' +
+        '<div class="form-group"><label>Letra sincronizada (mm:ss|texto, uma linha por vez)</label><textarea rows="4" placeholder="0:12|Primeira linha da letra" oninput="updateAlbumTrack(' + ti + ',\'lyrics\',textToLyrics(this.value))">' + esc(lyricsToText(t.lyrics)) + '</textarea></div>' +
         '<div class="form-group">' +
           '<label>Faixa completa (Premium + base da prévia)</label>' +
           '<input type="text" value="' + esc(t.fullAudio || '') + '" oninput="updateAlbumTrack(' + ti + ',\'fullAudio\',this.value)" placeholder="https://... ou envie abaixo">' +

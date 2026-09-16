@@ -143,6 +143,7 @@ function applyContentToSite() {
     if (discoSubEl) discoSubEl.textContent = CONTENT.discografia.subtitle;
 
     renderDiscography();
+    renderPlaylists();
     updateCartFab();
 
     var plansTitleEl = document.getElementById('plansModalTitle');
@@ -248,7 +249,8 @@ function renderDiscography() {
           '</div>' +
           '<div style="color:var(--text-dim);font-size:0.8rem;margin-top:0.3rem;">' + esc(album.description) + '</div>' +
         '</div>' +
-        '<button class="album-toggle" aria-label="Expandir/recolher" onclick="event.stopPropagation(); toggleAlbum(\'' + esc(album.id) + '\', event)">▼</button>' +
+        '<div class="album-actions"><button class="album-play" aria-label="Reproduzir álbum" title="Reproduzir álbum" onclick="event.stopPropagation(); playAlbum(\'' + esc(album.id) + '\')">▶</button>' +
+        '<button class="album-toggle" aria-label="Expandir/recolher" onclick="event.stopPropagation(); toggleAlbum(\'' + esc(album.id) + '\', event)">▼</button></div>' +
       '</div>' +
       '<div class="album-tracks">' +
         '<div class="discography-scroll" data-album="' + esc(album.id) + '">' +
@@ -269,6 +271,30 @@ function renderDiscography() {
   updatePlayingHighlight();
 }
 window.renderDiscography = renderDiscography;
+
+function resolvePlaylistTracks(playlist) {
+  return (playlist && Array.isArray(playlist.tracks) ? playlist.tracks : []).map(function (ref) {
+    var parts = String(ref).split(':');
+    var album = CONTENT.discografia.albums.find(function (item) { return item.id === parts[0]; });
+    var index = Number(parts[1]);
+    if (!album || !Number.isInteger(index) || !album.tracks[index]) return null;
+    return { album: album, track: album.tracks[index], trackIndex: index };
+  }).filter(Boolean);
+}
+
+function renderPlaylists() {
+  var grid = document.getElementById('playlistsGrid');
+  if (!grid) return;
+  var playlists = Array.isArray(CONTENT.playlists) ? CONTENT.playlists : [];
+  grid.innerHTML = playlists.map(function (playlist, index) {
+    var tracks = resolvePlaylistTracks(playlist);
+    return '<button class="playlist-card" onclick="playPlaylist(' + index + ')" aria-label="Reproduzir playlist ' + esc(playlist.title) + '">' +
+      '<span class="playlist-cover">' + esc(playlist.cover || '♪') + '</span>' +
+      '<span class="playlist-info"><strong>' + esc(playlist.title || 'Playlist') + '</strong><small>' + esc(playlist.description || '') + '</small><em>' + tracks.length + ' faixa' + (tracks.length === 1 ? '' : 's') + '</em></span>' +
+      '<span class="playlist-play">▶</span></button>';
+  }).join('') || '<p class="lyrics-empty">Nenhuma playlist disponível.</p>';
+}
+window.renderPlaylists = renderPlaylists;
 
 window.toggleAlbum = function (albumId, event) {
   if (event) event.stopPropagation();
@@ -367,6 +393,7 @@ function getGlobalIndex(albumId, trackIndex) {
 var audio = document.getElementById('audio');
 var flatPlaylist = [];
 var currentIndex = -1;
+var activeQueue = null;
 var isSeeking = false;
 var lastVolume = 0.8;
 var muted = false;
@@ -406,7 +433,7 @@ async function playFromDiscography(albumId, trackIndex) {
   var owns = ownsTrack(albumId, trackIndex);
   var canFull = premium || owns;
 
-  currentTrackIdentity = { albumId: albumId, trackTitle: track.title };
+  currentTrackIdentity = { albumId: albumId, trackIndex: trackIndex, trackTitle: track.title };
   currentIndex = getGlobalIndex(albumId, trackIndex);
 
   var cfg = computePlaybackConfig(track, canFull);
@@ -438,6 +465,7 @@ async function playFromDiscography(albumId, trackIndex) {
   if (nowTitleEl) nowTitleEl.textContent = track.title;
   var nowArtistEl = document.getElementById('nowArtist');
   if (nowArtistEl) nowArtistEl.textContent = 'Joseph Matthos · ' + album.title + (canFull ? '' : ' (prévia)');
+  renderLyrics(track);
   var previewBadgeEl = document.getElementById('previewBadge');
   if (previewBadgeEl) previewBadgeEl.classList.toggle('visible', !canFull);
 
@@ -464,6 +492,36 @@ async function playFromDiscography(albumId, trackIndex) {
     });
   }
 }
+
+function renderLyrics(track) {
+  var title = document.getElementById('lyricsTitle');
+  var content = document.getElementById('lyricsContent');
+  if (title) title.textContent = track ? track.title : 'Nenhuma faixa tocando';
+  if (!content) return;
+  var lyrics = track && Array.isArray(track.lyrics) ? track.lyrics : [];
+  content.innerHTML = lyrics.length ? lyrics.map(function (line, index) {
+    return '<button class="lyric-line" data-lyric-index="' + index + '" data-lyric-time="' + (Number(line.time) || 0) + '">' + esc(line.text) + '</button>';
+  }).join('') : '<p class="lyrics-empty">Esta faixa ainda não tem letra sincronizada.</p>';
+}
+
+function updateLyricsPosition() {
+  var lines = document.querySelectorAll('.lyric-line');
+  if (!lines.length) return;
+  var active = -1;
+  lines.forEach(function (line, index) { if (Number(line.dataset.lyricTime) <= audio.currentTime) active = index; });
+  lines.forEach(function (line, index) { line.classList.toggle('active', index === active); });
+  var current = active >= 0 ? lines[active] : null;
+  if (current && current.scrollIntoView) current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.getElementById('lyricsBtn').addEventListener('click', function () { document.getElementById('lyricsDrawer').classList.toggle('open'); });
+document.getElementById('closeLyrics').addEventListener('click', function () { document.getElementById('lyricsDrawer').classList.remove('open'); });
+document.addEventListener('click', function (event) {
+  var line = event.target.closest('.lyric-line');
+  if (!line) return;
+  audio.currentTime = Number(line.dataset.lyricTime) || 0;
+  audio.play().catch(function () {});
+});
 
 async function reloadCurrentTrackForPlan() {
   if (!currentTrackIdentity || !audio.src) return;
@@ -584,16 +642,18 @@ async function togglePlay() {
   } else { audio.pause(); }
 }
 function nextTrack() {
-  refreshFlatPlaylist();
-  if (!flatPlaylist.length) return;
-  var item = flatPlaylist[(currentIndex + 1) % flatPlaylist.length];
+  var queue = activeQueue || (refreshFlatPlaylist(), flatPlaylist);
+  if (!queue.length) return;
+  var position = activeQueue ? activeQueue.findIndex(function (item) { return item.album.id === currentTrackIdentity.albumId && item.trackIndex === currentTrackIdentity.trackIndex; }) : currentIndex;
+  var item = queue[(position + 1) % queue.length];
   playFromDiscography(item.album.id, item.trackIndex);
 }
 function prevTrack() {
-  refreshFlatPlaylist();
-  if (!flatPlaylist.length) return;
+  var queue = activeQueue || (refreshFlatPlaylist(), flatPlaylist);
+  if (!queue.length) return;
   if (audio.currentTime > 3 && !previewCutActive()) { audio.currentTime = previewState.start || 0; return; }
-  var item = flatPlaylist[currentIndex - 1 < 0 ? flatPlaylist.length - 1 : currentIndex - 1];
+  var position = activeQueue ? activeQueue.findIndex(function (item) { return item.album.id === currentTrackIdentity.albumId && item.trackIndex === currentTrackIdentity.trackIndex; }) : currentIndex;
+  var item = queue[position - 1 < 0 ? queue.length - 1 : position - 1];
   playFromDiscography(item.album.id, item.trackIndex);
 }
 function seekBy(seconds) {
@@ -608,6 +668,7 @@ function seekBy(seconds) {
 
 audio.addEventListener('timeupdate', function () {
   if (isSeeking) return;
+  updateLyricsPosition();
   if (previewCutActive() && audio.currentTime >= previewState.end) {
     audio.pause();
     audio.currentTime = previewState.end;
@@ -1290,3 +1351,20 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+
+async function playPlaylist(index) {
+  var playlist = Array.isArray(CONTENT.playlists) ? CONTENT.playlists[index] : null;
+  var queue = resolvePlaylistTracks(playlist);
+  if (!queue.length) { toast('Esta playlist não tem faixas válidas.', '⚠'); return; }
+  activeQueue = queue;
+  await playFromDiscography(queue[0].album.id, queue[0].trackIndex);
+}
+window.playPlaylist = playPlaylist;
+
+async function playAlbum(albumId) {
+  var album = CONTENT.discografia.albums.find(function (item) { return item.id === albumId; });
+  if (!album || !album.tracks.length) return;
+  activeQueue = album.tracks.map(function (track, trackIndex) { return { album: album, track: track, trackIndex: trackIndex }; });
+  await playFromDiscography(album.id, 0);
+}
+window.playAlbum = playAlbum;
