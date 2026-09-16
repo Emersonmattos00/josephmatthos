@@ -12,11 +12,7 @@ const CART_KEY = 'jm_cart_v1';
 const PURCHASES_KEY = 'jm_purchases_v1';
 const SCHEMA_VERSION = 5;
 
-// Credenciais padrão — usadas só quando NADA está salvo no localStorage
-const DEFAULT_ADMIN_USER = 'admin';
-const DEFAULT_ADMIN_PASS = 'admin123';
-
-// Debug opcional: ative com localStorage.setItem('jm_debug', '1')
+// Debug: ative com localStorage.setItem('jm_debug', '1')
 function _cartDebug() {
   try { return localStorage.getItem('jm_debug') === '1'; } catch (e) { return false; }
 }
@@ -96,27 +92,15 @@ function deepMerge(target, source) {
 
 /* ============================================================
    ADMIN — credenciais (SHA-256 com migração legada)
-   ------------------------------------------------------------
-   ✅ CORRIGIDO: getAdminCreds() NÃO salva o padrão no localStorage
-   automaticamente. Só grava quando o admin troca a senha
-   explicitamente via saveAdminCreds().
    ============================================================ */
-
 async function getAdminCreds() {
-  // 1) Tenta ler do localStorage
   try {
     var c = JSON.parse(localStorage.getItem(ADMIN_KEY));
-    if (c && c.user && c.passHash) {
-      return c; // ✅ Admin já configurou credenciais
-    }
+    if (c && c.user && c.passHash) return c;
   } catch (e) {}
-
-  // 2) Não existe → retorna o padrão EM MEMÓRIA (sem salvar)
-  return {
-    user: DEFAULT_ADMIN_USER,
-    passHash: await hashStr(DEFAULT_ADMIN_PASS),
-    _isDefault: true
-  };
+  var def = { user: 'admin', passHash: await hashStr('admin123') };
+  try { localStorage.setItem(ADMIN_KEY, JSON.stringify(def)); } catch (e) {}
+  return def;
 }
 
 async function saveAdminCreds(user, plainPass) {
@@ -214,7 +198,7 @@ function clearCart() {
 function addToCart(albumId, trackIndex) {
   _cartLog('addToCart chamado:', albumId, trackIndex);
 
-  if (albumId == null) { _cartLog('albumId inválido'); return false; }
+  if (!albumId && albumId !== 0) { _cartLog('albumId inválido'); return false; }
   trackIndex = parseInt(trackIndex, 10);
   if (isNaN(trackIndex) || trackIndex < 0) { _cartLog('trackIndex inválido'); return false; }
 
