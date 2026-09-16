@@ -1441,6 +1441,10 @@ nav .nav-cart.pop { animation: navCartPop 0.35s ease; }
 .playlist-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .playlist-info small, .playlist-info em { color: var(--text-dim); font-size: 0.72rem; font-style: normal; }
 .playlist-play { margin-left: auto; color: var(--accent); font-size: 1.1rem; }
+.playlist-track-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }
+.playlist-track-row:last-child { border-bottom: 0; }
+.playlist-track-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }
+.playlist-track-row:last-child { border-bottom: 0; }
 .album-actions { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; }
 .album-play, .album-toggle { display: grid; place-items: center; width: 32px; height: 32px; color: var(--accent); background: transparent; border: 1px solid var(--border); border-radius: 50%; cursor: pointer; }
 .album-play:hover, .album-toggle:hover { border-color: var(--accent); background: var(--accent-glow); }

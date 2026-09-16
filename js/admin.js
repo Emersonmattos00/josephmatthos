@@ -481,17 +481,39 @@ function renderPlaylistsEditor() {
   if (!wrap) return;
   CONTENT.playlists = Array.isArray(CONTENT.playlists) ? CONTENT.playlists : [];
   wrap.innerHTML = CONTENT.playlists.map(function (playlist, index) {
+    var trackRows = (playlist.tracks || []).map(function (ref, trackIndex) {
+      var parts = String(ref).split(':');
+      var album = CONTENT.discografia.albums.find(function (item) { return item.id === parts[0]; });
+      var track = album && album.tracks[Number(parts[1])];
+      var label = track ? album.title + ' — ' + track.title : ref;
+      return '<div class="playlist-track-row"><span>' + (trackIndex + 1) + '. ' + esc(label) + '</span><span>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="movePlaylistTrack(' + index + ',' + trackIndex + ',-1)" aria-label="Mover para cima">↑</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="movePlaylistTrack(' + index + ',' + trackIndex + ',1)" aria-label="Mover para baixo">↓</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="removePlaylistTrack(' + index + ',' + trackIndex + ')" aria-label="Excluir faixa">🗑</button></span></div>';
+    }).join('');
     return '<div class="track-editor playlist-editor">' +
       '<div class="track-head"><strong>' + esc(playlist.title || 'Playlist') + '</strong><button class="btn btn-ghost btn-sm" onclick="removePlaylist(' + index + ')">🗑</button></div>' +
       '<div class="form-row"><div class="form-group"><label>Nome</label><input value="' + esc(playlist.title || '') + '" oninput="updatePlaylist(' + index + ',\'title\',this.value)"></div>' +
       '<div class="form-group"><label>Capa/fallback</label><input maxlength="3" value="' + esc(playlist.cover || '♪') + '" oninput="updatePlaylist(' + index + ',\'cover\',this.value)"></div></div>' +
       '<div class="form-group"><label>Descrição</label><input value="' + esc(playlist.description || '') + '" oninput="updatePlaylist(' + index + ',\'description\',this.value)"></div>' +
-      '<div class="form-group"><label>Faixas</label><input value="' + esc((playlist.tracks || []).join(', ')) + '" placeholder="album-bbb:0, album-bbb:1" oninput="updatePlaylistTracks(' + index + ',this.value)"></div>' +
+      '<div class="form-group"><label>Faixas na ordem de reprodução</label>' + (trackRows || '<p class="hint">Nenhuma faixa adicionada.</p>') + '</div>' +
+      '<div class="form-group"><label>Adicionar referências</label><input value="' + esc((playlist.tracks || []).join(', ')) + '" placeholder="album-bbb:0, album-bbb:1" oninput="updatePlaylistTracks(' + index + ',this.value)"></div>' +
       '</div>';
   }).join('') || '<p class="hint">Nenhuma playlist criada.</p>';
 }
-window.updatePlaylist = function (index, key, value) { CONTENT.playlists[index][key] = value; applyContentToSite(); };
-window.updatePlaylistTracks = function (index, value) { CONTENT.playlists[index].tracks = String(value).split(',').map(function (x) { return x.trim(); }).filter(Boolean); applyContentToSite(); };
+window.updatePlaylist = function (index, key, value) { CONTENT.playlists[index][key] = value; applyContentToSite(); saveContent(); };
+window.updatePlaylistTracks = function (index, value) { CONTENT.playlists[index].tracks = String(value).split(',').map(function (x) { return x.trim(); }).filter(Boolean); applyContentToSite(); saveContent(); };
+window.movePlaylistTrack = function (playlistIndex, trackIndex, direction) {
+  var tracks = CONTENT.playlists[playlistIndex].tracks;
+  var target = trackIndex + direction;
+  if (target < 0 || target >= tracks.length) return;
+  var item = tracks.splice(trackIndex, 1)[0]; tracks.splice(target, 0, item);
+  renderPlaylistsEditor(); applyContentToSite(); saveContent();
+};
+window.removePlaylistTrack = function (playlistIndex, trackIndex) {
+  CONTENT.playlists[playlistIndex].tracks.splice(trackIndex, 1);
+  renderPlaylistsEditor(); applyContentToSite(); saveContent();
+};
 window.removePlaylist = function (index) { CONTENT.playlists.splice(index, 1); renderPlaylistsEditor(); applyContentToSite(); saveContent(); };
 var addPlaylistBtn = document.getElementById('addPlaylistBtn');
 if (addPlaylistBtn) addPlaylistBtn.addEventListener('click', function () {
