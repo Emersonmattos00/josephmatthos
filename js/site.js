@@ -308,8 +308,9 @@ window.toggleAlbum = function (albumId, event) {
 function renderDiscographyCard(album, track, trackIndex) {
   var premium = isPremium();
   var owns = ownsTrack(album.id, trackIndex);
+  var rented = isRentedTrack(album.id, trackIndex);
   var inCart = isInCart(album.id, trackIndex);
-  var canFull = premium || owns;
+  var canFull = premium || owns || rented;
   var forSale = track.forSale !== false && (track.price == null || track.price > 0);
   var price = parseFloat(track.price) || parseFloat(CONTENT.loja.defaultPrice) || 4.90;
 
@@ -351,9 +352,9 @@ function renderDiscographyCard(album, track, trackIndex) {
     priceHTML = '<div class="discography-track-price">🔒<small>exclusivo Premium</small></div>';
   }
 
-  return '<div class="discography-track-card ' + (isPlaying ? 'playing' : '') + '" data-album="' + esc(album.id) + '" data-track="' + esc(track.title) + '">' +
+  return '<div class="discography-track-card ' + (isPlaying ? 'playing' : '') + '" data-album="' + esc(album.id) + '" data-track="' + esc(track.title) + '" onclick="openExpandedPlayer(\'' + esc(album.id) + '\',' + trackIndex + ', event)">' +
     (owns ? '<span class="discography-owned-badge">✓ Sua</span>' : '') +
-    '<div class="discography-track-cover" ' + coverStyle + ' onclick="playFromDiscography(\'' + esc(album.id) + '\',' + trackIndex + ')">' + coverText + '</div>' +
+    '<div class="discography-track-cover" ' + coverStyle + '>' + coverText + '</div>' +
     '<div class="discography-track-body">' +
       '<div class="discography-track-title">' + esc(track.title) + '</div>' +
       '<div class="discography-track-meta">' +
@@ -369,6 +370,70 @@ function renderDiscographyCard(album, track, trackIndex) {
   '</div>';
 }
 window.renderDiscographyCard = renderDiscographyCard;
+
+function openExpandedPlayer(albumId, trackIndex, event) {
+  if (event && event.target.closest('button')) return;
+  var modal = document.getElementById('expandedPlayerModal');
+  if (!modal) return;
+  var album = CONTENT.discografia.albums.find(function (item) { return item.id === albumId; });
+  activeQueue = isPremium() && album ? album.tracks.map(function (track, index) { return { album: album, track: track, trackIndex: index }; }) : null;
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  playFromDiscography(albumId, trackIndex);
+  renderExpandedPlayerActions(albumId, trackIndex);
+}
+window.openExpandedPlayer = openExpandedPlayer;
+
+function isRentedTrack(albumId, trackIndex) {
+  if (!currentUser() || isProductionMode()) return false;
+  try {
+    var rentals = JSON.parse(localStorage.getItem('jm_rentals') || '{}');
+    return Number(rentals[currentUser().id + ':' + albumId + ':' + trackIndex]) > Date.now();
+  } catch (error) { return false; }
+}
+
+function handleRentTrack(albumId, trackIndex) {
+  if (isProductionMode()) { toast('Aluguel real será liberado após a integração de pagamento.', '⚠'); return; }
+  if (!currentUser()) { toast('Entre na sua conta para alugar a faixa.', 'ℹ'); openModal('loginModal'); return; }
+  try {
+    var rentals = JSON.parse(localStorage.getItem('jm_rentals') || '{}');
+    rentals[currentUser().id + ':' + albumId + ':' + trackIndex] = Date.now() + 48 * 60 * 60 * 1000;
+    localStorage.setItem('jm_rentals', JSON.stringify(rentals));
+    renderExpandedPlayerActions(albumId, trackIndex);
+    renderDiscography();
+    playFromDiscography(albumId, trackIndex);
+    toast('Aluguel ativo por 48 horas.', '✓');
+  } catch (error) { toast('Não foi possível ativar o aluguel.', '⚠'); }
+}
+window.handleRentTrack = handleRentTrack;
+
+function closeExpandedPlayer() {
+  var modal = document.getElementById('expandedPlayerModal');
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function renderExpandedPlayerActions(albumId, trackIndex) {
+  var wrap = document.getElementById('expandedPlayerActions');
+  if (!wrap) return;
+  var album = CONTENT.discografia.albums.find(function (item) { return item.id === albumId; });
+  var track = album && album.tracks[trackIndex];
+  if (!track) return;
+  var premium = isPremium();
+  var owns = ownsTrack(albumId, trackIndex);
+  var price = parseFloat(track.price) || parseFloat(CONTENT.loja.defaultPrice) || 4.90;
+  var html = '';
+  if (premium) {
+    html += '<span class="expanded-access">Premium: álbum completo liberado</span>';
+  } else if (owns) {
+    html += '<span class="expanded-access">Faixa comprada: reprodução completa</span>';
+  } else {
+    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); handleRentTrack(\'' + esc(albumId) + '\',' + trackIndex + ')">Alugar 48h</button>';
+    html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); handleShopBuy(\'' + esc(albumId) + '\',' + trackIndex + ')">Comprar ' + formatPrice(price) + '</button>';
+    html += '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); closeExpandedPlayer(); openSubscribeModal(\'premium\')">Assinar Premium</button>';
+  }
+  wrap.innerHTML = html;
+}
 
 function buildFlatPlaylist() {
   var flat = [];
@@ -431,7 +496,8 @@ async function playFromDiscography(albumId, trackIndex) {
 
   var premium = isPremium();
   var owns = ownsTrack(albumId, trackIndex);
-  var canFull = premium || owns;
+  var rented = isRentedTrack(albumId, trackIndex);
+  var canFull = premium || owns || rented;
 
   currentTrackIdentity = { albumId: albumId, trackIndex: trackIndex, trackTitle: track.title };
   currentIndex = getGlobalIndex(albumId, trackIndex);
@@ -466,6 +532,7 @@ async function playFromDiscography(albumId, trackIndex) {
   var nowArtistEl = document.getElementById('nowArtist');
   if (nowArtistEl) nowArtistEl.textContent = 'Joseph Matthos · ' + album.title + (canFull ? '' : ' (prévia)');
   renderLyrics(track);
+  syncExpandedPlayer(track, album, canFull);
   var previewBadgeEl = document.getElementById('previewBadge');
   if (previewBadgeEl) previewBadgeEl.classList.toggle('visible', !canFull);
 
@@ -502,6 +569,37 @@ function renderLyrics(track) {
   content.innerHTML = lyrics.length ? lyrics.map(function (line, index) {
     return '<button class="lyric-line" data-lyric-index="' + index + '" data-lyric-time="' + (Number(line.time) || 0) + '">' + esc(line.text) + '</button>';
   }).join('') : '<p class="lyrics-empty">Esta faixa ainda não tem letra sincronizada.</p>';
+  var expanded = document.getElementById('expandedLyricsContent');
+  if (expanded) expanded.innerHTML = content.innerHTML;
+}
+
+function syncExpandedPlayer(track, album, canFull) {
+  var title = document.getElementById('expandedPlayerTitle');
+  var albumEl = document.getElementById('expandedPlayerAlbum');
+  var cover = document.getElementById('expandedPlayerCover');
+  var badge = document.getElementById('expandedPreviewBadge');
+  if (title) title.textContent = track.title;
+  if (albumEl) albumEl.textContent = 'Joseph Matthos · ' + album.title;
+  if (cover) {
+    cover.style.backgroundImage = album.coverImage ? 'url(' + safeMediaUrl(album.coverImage) + ')' : '';
+    cover.textContent = album.coverImage ? '' : (album.cover || '♪');
+  }
+  if (badge) badge.classList.toggle('visible', !canFull);
+  renderExpandedPlayerActions(album.id, trackIndexFromAlbum(album, track));
+}
+
+function trackIndexFromAlbum(album, track) { return album.tracks.indexOf(track); }
+
+function syncExpandedProgress() {
+  var current = document.getElementById('expandedCurrentTime');
+  var duration = document.getElementById('expandedDuration');
+  var fill = document.getElementById('expandedProgressFill');
+  var bar = document.getElementById('expandedProgressBar');
+  var percent = previewCutActive() ? ((audio.currentTime - previewState.start) / Math.max(1, previewState.end - previewState.start)) * 100 : (audio.duration ? audio.currentTime / audio.duration * 100 : 0);
+  if (current) current.textContent = formatTime(previewCutActive() ? Math.max(0, audio.currentTime - previewState.start) : audio.currentTime);
+  if (duration) duration.textContent = formatTime(previewCutActive() ? previewState.end - previewState.start : audio.duration);
+  if (fill) fill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+  if (bar) bar.setAttribute('aria-valuenow', String(Math.round(percent)));
 }
 
 function updateLyricsPosition() {
@@ -516,6 +614,26 @@ function updateLyricsPosition() {
 
 document.getElementById('lyricsBtn').addEventListener('click', function () { document.getElementById('lyricsDrawer').classList.toggle('open'); });
 document.getElementById('closeLyrics').addEventListener('click', function () { document.getElementById('lyricsDrawer').classList.remove('open'); });
+document.getElementById('closeExpandedPlayer').addEventListener('click', closeExpandedPlayer);
+document.getElementById('expandedPrevBtn').addEventListener('click', prevTrack);
+document.getElementById('expandedNextBtn').addEventListener('click', nextTrack);
+document.getElementById('expandedPlayBtn').addEventListener('click', togglePlay);
+document.getElementById('expandedMuteBtn').addEventListener('click', function () {
+  if (muted) { setVolume(lastVolume || 0.8); muted = false; } else { lastVolume = audio.volume; setVolume(0); muted = true; }
+  document.getElementById('expandedMuteBtn').textContent = muted ? '🔇' : '🔊';
+});
+document.getElementById('expandedDownloadBtn').addEventListener('click', function () {
+  if (!currentTrackIdentity) return;
+  var album = CONTENT.discografia.albums.find(function (item) { return item.id === currentTrackIdentity.albumId; });
+  if (album) downloadTrack(album.id, currentTrackIdentity.trackIndex);
+});
+document.getElementById('expandedProgressBar').addEventListener('click', function (event) {
+  var rect = event.currentTarget.getBoundingClientRect();
+  var percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  if (previewCutActive()) audio.currentTime = previewState.start + percent * (previewState.end - previewState.start);
+  else if (audio.duration) audio.currentTime = percent * audio.duration;
+  syncExpandedProgress();
+});
 document.addEventListener('click', function (event) {
   var line = event.target.closest('.lyric-line');
   if (!line) return;
@@ -668,6 +786,7 @@ function seekBy(seconds) {
 
 audio.addEventListener('timeupdate', function () {
   if (isSeeking) return;
+  syncExpandedProgress();
   updateLyricsPosition();
   if (previewCutActive() && audio.currentTime >= previewState.end) {
     audio.pause();
@@ -717,6 +836,8 @@ audio.addEventListener('play', function () {
   if (coverEl) coverEl.classList.add('spinning');
   var heroVinylEl = document.getElementById('heroVinyl');
   if (heroVinylEl) heroVinylEl.classList.add('spinning');
+  var expandedPlay = document.getElementById('expandedPlayBtn');
+  if (expandedPlay) expandedPlay.textContent = '⏸';
 });
 audio.addEventListener('pause', function () {
   var playBtnEl = document.getElementById('playBtn');
@@ -725,6 +846,8 @@ audio.addEventListener('pause', function () {
   if (coverEl) coverEl.classList.remove('spinning');
   var heroVinylEl = document.getElementById('heroVinyl');
   if (heroVinylEl) heroVinylEl.classList.remove('spinning');
+  var expandedPlay = document.getElementById('expandedPlayBtn');
+  if (expandedPlay) expandedPlay.textContent = '▶';
 });
 audio.addEventListener('error', function () {
   toast('Erro ao carregar a faixa.', '⚠');

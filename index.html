@@ -198,6 +198,34 @@
     <div id="lyricsContent" class="lyrics-content"><p class="lyrics-empty">Toque uma faixa com letra cadastrada.</p></div>
   </div>
 
+  <div class="modal-overlay player-modal-overlay" id="expandedPlayerModal" role="dialog" aria-modal="true" aria-labelledby="expandedPlayerTitle">
+    <div class="expanded-player">
+      <button class="modal-close" id="closeExpandedPlayer" aria-label="Fechar player">×</button>
+      <div class="expanded-player-main">
+        <div class="expanded-player-cover" id="expandedPlayerCover"></div>
+        <div class="expanded-player-meta">
+          <span class="now-label">TOCANDO AGORA <span class="preview-badge" id="expandedPreviewBadge">PRÉVIA</span></span>
+          <h2 id="expandedPlayerTitle">Nenhuma faixa selecionada</h2>
+          <p id="expandedPlayerAlbum">Joseph Matthos</p>
+          <div class="expanded-player-actions" id="expandedPlayerActions"></div>
+        </div>
+      </div>
+      <div class="expanded-controls">
+        <button class="ctrl" id="expandedPrevBtn" title="Faixa anterior" aria-label="Faixa anterior">⏮</button>
+        <button class="ctrl ctrl-play" id="expandedPlayBtn" title="Reproduzir ou pausar" aria-label="Reproduzir ou pausar">▶</button>
+        <button class="ctrl" id="expandedNextBtn" title="Próxima faixa" aria-label="Próxima faixa">⏭</button>
+        <button class="ctrl" id="expandedMuteBtn" title="Ativar ou desativar som" aria-label="Ativar ou desativar som">🔊</button>
+        <button class="ctrl" id="expandedDownloadBtn" title="Baixar faixa" aria-label="Baixar faixa">⬇</button>
+      </div>
+      <div class="expanded-progress">
+        <span id="expandedCurrentTime">0:00</span>
+        <div class="progress-bar" id="expandedProgressBar" role="slider" aria-label="Progresso da faixa ampliado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><div class="progress-fill" id="expandedProgressFill"></div></div>
+        <span id="expandedDuration">0:00</span>
+      </div>
+      <div class="expanded-lyrics" id="expandedLyricsContent"><p class="lyrics-empty">Cadastre uma letra sincronizada para esta faixa.</p></div>
+    </div>
+  </div>
+
   <!-- MODAIS -->
   <div class="modal-overlay" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <div class="modal">
