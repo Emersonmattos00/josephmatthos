@@ -230,8 +230,8 @@ function renderDiscography() {
       tracks.push({ track: track, trackIndex: ti });
     });
 
-    if (!tracks.length) return;
-    totalVisible += tracks.length;
+    if (!tracks.length && q) return;
+    totalVisible += tracks.length || 1;
 
     var isExpanded = forceOpen || _expandedAlbumId === album.id;
 
@@ -253,9 +253,9 @@ function renderDiscography() {
       '</div>' +
       '<div class="album-tracks">' +
         '<div class="discography-scroll" data-album="' + esc(album.id) + '">' +
-          tracks.map(function (item) {
+          (tracks.length ? tracks.map(function (item) {
             return renderDiscographyCard(album, item.track, item.trackIndex);
-          }).join('') +
+          }).join('') : '<p class="album-empty">Nenhuma faixa cadastrada neste álbum.</p>') +
         '</div>' +
       '</div>' +
     '</div>';
