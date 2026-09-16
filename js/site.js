@@ -202,6 +202,7 @@ function applyContentToSite() {
    DISCOGRAFIA
    ============================================================ */
 let currentFilter = 'all';
+let discographyViewMode = 'cards';
 let currentTrackIdentity = null;
 var _shopSearch = '';
 var _expandedAlbumId = null;
@@ -266,6 +267,7 @@ function renderDiscography() {
     return;
   }
 
+  container.classList.toggle('view-list', discographyViewMode === 'list');
   container.innerHTML = html;
   updatePlayingHighlight();
 }
@@ -308,7 +310,7 @@ function renderDiscographyCard(album, track, trackIndex) {
   var premium = isPremium();
   var owns = ownsTrack(album.id, trackIndex);
   var rented = isRentedTrack(album.id, trackIndex);
-  var inCart = isInCart(album.id, trackIndex);
+  var inCart = isInCart(album.id, trackIndex, 'purchase');
   var canFull = premium || owns || rented;
   var forSale = track.forSale !== false && (track.price == null || track.price > 0);
   var price = parseFloat(track.price) || parseFloat(CONTENT.loja.defaultPrice) || 4.90;
@@ -386,13 +388,10 @@ function handleRentTrack(albumId, trackIndex) {
   var album = CONTENT.discografia.albums.find(function (item) { return item.id === albumId; });
   var track = album && album.tracks[trackIndex];
   if (!track) return;
-  if (isProductionMode()) {
-    fetch('/api/payments-rental', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ albumId: albumId, trackIndex: trackIndex, title: track.title, amount: parseFloat(track.rentalPrice) || parseFloat(track.price) || parseFloat(CONTENT.loja.defaultPrice) || 4.90 }) })
-      .then(function (response) { return response.json().then(function (result) { return { response: response, result: result }; }); })
-      .then(function (data) { if (!data.response.ok || !data.result.ok) { toast(data.result.error || 'Não foi possível iniciar o aluguel.', '⚠'); return; } window.location.assign(data.result.checkoutUrl); })
-      .catch(function () { toast('Gateway de pagamento indisponível.', '⚠'); });
-    return;
-  }
+  var added = addToCart(albumId, trackIndex, 'rental');
+  if (added) { toast('Aluguel adicionado ao carrinho.', '⌛'); renderDiscography(); updateCartFab(); openCartModal(); }
+  else toast('O aluguel desta faixa já está no carrinho.', 'ℹ');
+  return;
   try {
     var rentals = JSON.parse(localStorage.getItem('jm_rentals') || '{}');
     rentals[currentUser().id + ':' + albumId + ':' + trackIndex] = Date.now() + 48 * 60 * 60 * 1000;
@@ -1180,6 +1179,14 @@ document.getElementById('subscribeForm').addEventListener('submit', function (e)
 });
 
 document.getElementById('filterBar').addEventListener('click', function (e) {
+  var viewButton = e.target.closest('.view-mode-btn');
+  if (viewButton) {
+    document.querySelectorAll('.view-mode-btn').forEach(function (button) { button.classList.remove('active'); });
+    viewButton.classList.add('active');
+    discographyViewMode = viewButton.dataset.viewMode === 'list' ? 'list' : 'cards';
+    renderDiscography();
+    return;
+  }
   var b = e.target.closest('.filter-btn');
   if (!b) return;
   document.querySelectorAll('.filter-btn').forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
@@ -1253,7 +1260,7 @@ function renderCartItems() {
       '<div class="cart-item-cover" ' + coverStyle + '>' + coverText + '</div>' +
       '<div class="cart-item-info">' +
         '<div class="cart-item-title">' + esc(i.title) + '</div>' +
-        '<div class="cart-item-album">' + esc(i.albumTitle) + '</div>' +
+        '<div class="cart-item-album">' + esc(i.albumTitle) + ' · ' + (i.purchaseType === 'rental' ? 'Aluguel 48h' : 'Compra') + '</div>' +
       '</div>' +
       '<div class="cart-item-price">' + formatPrice(i.price) + '</div>' +
       '<button class="cart-item-remove" onclick="handleCartRemove(\'' + esc(i.albumId) + '\',' + i.trackIndex + ')" aria-label="Remover">🗑</button>' +

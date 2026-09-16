@@ -725,7 +725,7 @@ const Store = (() => {
     return saveCart([]);
   }
 
-  function addToCart(albumId, trackIndex) {
+  function addToCart(albumId, trackIndex, purchaseType) {
     if (!albumId && albumId !== 0) {
       logError('albumId inválido');
       return false;
@@ -740,8 +740,9 @@ const Store = (() => {
     const cart = getCart();
     
     // Verifica se já existe
+    const type = purchaseType === 'rental' ? 'rental' : 'purchase';
     const exists = cart.some(item => 
-      item.albumId === albumId && Number(item.trackIndex) === trackIndex
+      item.albumId === albumId && Number(item.trackIndex) === trackIndex && (item.purchaseType || 'purchase') === type
     );
     
     if (exists) {
@@ -783,7 +784,9 @@ const Store = (() => {
       albumTitle: album.title,
       albumCover: album.coverImage || '',
       albumCoverText: album.cover || '',
-      price
+      price,
+      purchaseType: type,
+      rentalHours: type === 'rental' ? 48 : null
     });
     
     const success = saveCart(cart);
@@ -811,11 +814,12 @@ const Store = (() => {
     return cart;
   }
 
-  function isInCart(albumId, trackIndex) {
+  function isInCart(albumId, trackIndex, purchaseType) {
     trackIndex = parseInt(trackIndex, 10);
+    const type = purchaseType || null;
     
     return getCart().some(item => 
-      item.albumId === albumId && Number(item.trackIndex) === trackIndex
+      item.albumId === albumId && Number(item.trackIndex) === trackIndex && (!type || (item.purchaseType || 'purchase') === type)
     );
   }
 
@@ -910,6 +914,9 @@ const Store = (() => {
         title: item.title,
         albumTitle: item.albumTitle,
         price: item.price,
+        purchaseType: item.purchaseType || 'purchase',
+        rentalHours: item.rentalHours || null,
+        expiresAt: item.purchaseType === 'rental' ? now + (item.rentalHours || 48) * 60 * 60 * 1000 : null,
         date: now
       });
     });

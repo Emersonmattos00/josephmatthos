@@ -1451,6 +1451,22 @@ nav .nav-cart.pop { animation: navCartPop 0.35s ease; }
 .track-action-icon:hover::after, .track-action-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
 .track-action-icon.in-cart { color: var(--success); cursor: default; }
 .track-owned-label { color: var(--success); font-size: 0.75rem; }
+.view-mode-buttons { display: flex; gap: 0.35rem; margin-left: auto; }
+.view-mode-btn { display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-dim); background: var(--card); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.view-mode-btn.active, .view-mode-btn:hover { color: var(--accent); border-color: var(--accent); }
+.track-actions { justify-content: center; }
+#discographyContainer.view-list .discography-scroll { display: flex; flex-direction: column; gap: 0.5rem; }
+#discographyContainer.view-list .discography-track-card { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 0.8rem; width: 100%; min-height: 72px; padding: 0.55rem 0.75rem; }
+#discographyContainer.view-list .discography-track-cover { width: 48px; height: 48px; }
+#discographyContainer.view-list .discography-track-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
+#discographyContainer.view-list .discography-track-footer { justify-content: flex-end; gap: 0.75rem; }
+#discographyContainer.view-list .discography-track-price small { display: none; }
+@media (max-width: 600px) {
+  .view-mode-buttons { margin-left: 0; }
+  #discographyContainer.view-list .discography-track-card { grid-template-columns: 48px 1fr; }
+  #discographyContainer.view-list .discography-track-body { display: block; }
+  #discographyContainer.view-list .discography-track-footer { justify-content: space-between; margin-top: 0.35rem; }
+}
 .playlist-track-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }
 .playlist-track-row:last-child { border-bottom: 0; }
 .album-actions { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; }
