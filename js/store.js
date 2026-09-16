@@ -1,324 +1,1121 @@
 /* ============================================================
    STORE.JS — Persistência em localStorage + loja
+   ------------------------------------------------------------
+   Versão Melhorada:
+   - Module Pattern (sem poluição global)
+   - Tratamento robusto de erros e quota
+   - Validação de integridade dos dados
+   - Sistema de migração versionado
+   - Logging controlado por ambiente
+   - Proteção contra corrupção de dados
+   - API pública limpa e tipada
    ============================================================ */
 
-const CONTENT_KEY = 'jm_content_v5';
-const USERS_KEY = 'jm_users_v2';
-const SESSION_KEY = 'jm_session_v2';
-const ADMIN_KEY = '';
-const ADMIN_SESSION_KEY = 'jm_admin_session_v2';
-const VOLUME_KEY = 'jm_volume_v1';
-const CART_KEY = 'jm_cart_v1';
-const PURCHASES_KEY = 'jm_purchases_v1';
-const SCHEMA_VERSION = 5;
+'use strict';
 
-// Debug: ative com localStorage.setItem('jm_debug', '1')
-function _cartDebug() {
-  try { return localStorage.getItem('jm_debug') === '1'; } catch (e) { return false; }
-}
-function _cartLog() {
-  if (_cartDebug()) console.log.apply(console, ['[CART]'].concat(Array.prototype.slice.call(arguments)));
-}
+const Store = (() => {
+  // ========================================
+  // CONSTANTES
+  // ========================================
+  const STORAGE_KEYS = {
+    CONTENT: 'jm_content',
+    USERS: 'jm_users',
+    SESSION: 'jm_session',
+    ADMIN: 'jm_admin',
+    ADMIN_SESSION: 'jm_admin_session',
+    VOLUME: 'jm_volume',
+    CART: 'jm_cart',
+    PURCHASES: 'jm_purchases',
+    DEBUG: 'jm_debug'
+  };
 
-// Notifica quem estiver ouvindo (fallback caso updateCartFab não exista)
-function _notifyCartChanged() {
-  try {
-    if (typeof updateCartFab === 'function') {
-      updateCartFab();
-      _cartLog('updateCartFab() chamada com sucesso');
-    } else {
-      _cartLog('updateCartFab ainda não definida — disparando evento cart:updated');
-      window.dispatchEvent(new CustomEvent('cart:updated'));
+  const CURRENT_SCHEMA_VERSION = 5;
+  const MAX_STORAGE_SIZE = 5 * 1024 * 1024; // 5MB
+  const STORAGE_WARNING_THRESHOLD = 0.9; // 90%
+
+  // ========================================
+  // ESTADO INTERNO
+  // ========================================
+  let content = null;
+  let isDebugMode = false;
+
+  // ========================================
+  // UTILITÁRIOS DE STORAGE
+  // ========================================
+  
+  /**
+   * Verifica se localStorage está disponível
+   */
+  function isStorageAvailable() {
+    try {
+      const test = '__storage_test__';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      return true;
+    } catch (e) {
+      return false;
     }
-  } catch (e) {
-    console.warn('[CART] Erro ao notificar mudança:', e);
   }
-}
 
-let CONTENT = loadContent();
-window.CONTENT = CONTENT;
-
-function setContent(newContent) {
-  CONTENT = newContent;
-  window.CONTENT = newContent;
-}
-
-function loadContent() {
-  try {
-    var stored = JSON.parse(localStorage.getItem(CONTENT_KEY));
-    if (!stored) return JSON.parse(JSON.stringify(DEFAULT_CONTENT));
-    var merged = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONTENT)), stored);
-
-    // 🩹 Migração: garante campos novos em faixas antigas
-    if (merged.discografia && Array.isArray(merged.discografia.albums)) {
-      merged.discografia.albums.forEach(function (a) {
-        if (!Array.isArray(a.tracks)) a.tracks = [];
-        a.tracks.forEach(function (t) {
-          if (t.previewStart == null) t.previewStart = 0;
-          if (t.previewDuration == null) t.previewDuration = 30;
-          if (t.previewAudio == null) t.previewAudio = '';
-          if (t.fullAudio == null) t.fullAudio = '';
-          if (t.price == null) t.price = merged.loja ? merged.loja.defaultPrice : 4.90;
-          if (t.forSale == null) t.forSale = true;
-        });
-      });
+  /**
+   * Verifica quota disponível no localStorage
+   */
+  function checkStorageQuota() {
+    try {
+      let total = 0;
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          total += localStorage[key].length + key.length;
+        }
+      }
+      const usedPercent = total / MAX_STORAGE_SIZE;
+      
+      if (usedPercent > STORAGE_WARNING_THRESHOLD) {
+        console.warn(`⚠️ Armazenamento quase cheio: ${(usedPercent * 100).toFixed(1)}%`);
+        return { available: false, usedPercent };
+      }
+      
+      return { available: true, usedPercent };
+    } catch (e) {
+      return { available: true, usedPercent: 0 };
     }
-    return merged;
-  } catch (e) {
-    console.error('Erro ao carregar conteúdo, usando padrão:', e);
+  }
+
+  /**
+   * Lê dados do localStorage com tratamento de erros
+   */
+  function readStorage(key, defaultValue = null) {
+    if (!isStorageAvailable()) {
+      log('Storage não disponível, usando valor padrão');
+      return defaultValue;
+    }
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return defaultValue;
+      
+      const parsed = JSON.parse(raw);
+      
+      // Validação básica de integridade
+      if (parsed === null || parsed === undefined) {
+        log(`Dados corrompidos em ${key}, usando padrão`);
+        return defaultValue;
+      }
+      
+      return parsed;
+    } catch (error) {
+      logError(`Erro ao ler ${key}:`, error);
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Escreve dados no localStorage com verificação de quota
+   */
+  function writeStorage(key, value) {
+    if (!isStorageAvailable()) {
+      logError('Storage não disponível');
+      return false;
+    }
+
+    try {
+      const serialized = JSON.stringify(value);
+      
+      // Verifica quota antes de escrever
+      const quota = checkStorageQuota();
+      if (!quota.available) {
+        const error = new Error('Armazenamento cheio');
+        logError('Quota excedida:', error);
+        
+        if (typeof toast === 'function') {
+          toast('Armazenamento do navegador cheio. Limpe dados antigos.', '⚠');
+        }
+        
+        return false;
+      }
+      
+      localStorage.setItem(key, serialized);
+      return true;
+    } catch (error) {
+      logError(`Erro ao escrever ${key}:`, error);
+      
+      if (error.name === 'QuotaExceededError' || error.code === 22) {
+        if (typeof toast === 'function') {
+          toast('Armazenamento cheio. Não foi possível salvar.', '⚠');
+        }
+      } else {
+        if (typeof toast === 'function') {
+          toast('Erro ao salvar dados.', '⚠');
+        }
+      }
+      
+      return false;
+    }
+  }
+
+  /**
+   * Remove dados do localStorage
+   */
+  function removeStorage(key) {
+    if (!isStorageAvailable()) return false;
+    
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      logError(`Erro ao remover ${key}:`, error);
+      return false;
+    }
+  }
+
+  // ========================================
+  // LOGGING
+  // ========================================
+  
+  function initDebugMode() {
+    isDebugMode = readStorage(STORAGE_KEYS.DEBUG, false) === '1';
+  }
+
+  function log(...args) {
+    if (isDebugMode) {
+      console.log('[STORE]', ...args);
+    }
+  }
+
+  function logError(...args) {
+    console.error('[STORE ERROR]', ...args);
+  }
+
+  function setDebugMode(enabled) {
+    isDebugMode = enabled;
+    writeStorage(STORAGE_KEYS.DEBUG, enabled ? '1' : '0');
+  }
+
+  // ========================================
+  // CONTENT MANAGEMENT
+  // ========================================
+  
+  /**
+   * Carrega conteúdo do storage ou usa padrão
+   */
+  function loadContent() {
+    try {
+      const stored = readStorage(STORAGE_KEYS.CONTENT);
+      
+      if (!stored) {
+        log('Nenhum conteúdo salvo, usando padrão');
+        return getDefaultContent();
+      }
+      
+      // Valida schema version
+      const storedVersion = stored._metadata?.version || 0;
+      
+      if (storedVersion < CURRENT_SCHEMA_VERSION) {
+        log(`Migrando conteúdo da v${storedVersion} para v${CURRENT_SCHEMA_VERSION}`);
+        const migrated = migrateContent(stored, storedVersion);
+        return migrated;
+      }
+      
+      // Merge com padrão para garantir campos novos
+      const merged = deepMerge(getDefaultContent(), stored);
+      
+      // Validação de integridade
+      if (typeof validateContent === 'function') {
+        const validation = validateContent(merged);
+        if (!validation.valid) {
+          logError('Conteúdo inválido:', validation.errors);
+          // Continua mesmo assim, mas loga
+        }
+      }
+      
+      return merged;
+    } catch (error) {
+      logError('Erro ao carregar conteúdo:', error);
+      return getDefaultContent();
+    }
+  }
+
+  /**
+   * Salva conteúdo no storage
+   */
+  function saveContent() {
+    if (!content) {
+      logError('Tentativa de salvar conteúdo nulo');
+      return false;
+    }
+
+    // Atualiza metadata
+    if (!content._metadata) {
+      content._metadata = {};
+    }
+    content._metadata.version = CURRENT_SCHEMA_VERSION;
+    content._metadata.updatedAt = new Date().toISOString();
+
+    const success = writeStorage(STORAGE_KEYS.CONTENT, content);
+    
+    if (success) {
+      log('Conteúdo salvo com sucesso');
+    }
+    
+    return success;
+  }
+
+  /**
+   * Define novo conteúdo
+   */
+  function setContent(newContent) {
+    if (!newContent || typeof newContent !== 'object') {
+      logError('Conteúdo inválido');
+      return false;
+    }
+    
+    content = newContent;
+    window.CONTENT = content; // Compatibilidade
+    return true;
+  }
+
+  /**
+   * Obtém conteúdo atual
+   */
+  function getContent() {
+    if (!content) {
+      content = loadContent();
+      window.CONTENT = content;
+    }
+    return content;
+  }
+
+  /**
+   * Obtém conteúdo padrão
+   */
+  function getDefaultContent() {
+    if (typeof DEFAULT_CONTENT === 'undefined') {
+      logError('DEFAULT_CONTENT não definido');
+      return {};
+    }
     return JSON.parse(JSON.stringify(DEFAULT_CONTENT));
   }
-}
 
-function saveContent() {
-  try {
-    localStorage.setItem(CONTENT_KEY, JSON.stringify(CONTENT));
-  } catch (e) {
-    console.error('Erro ao salvar:', e);
-    toast('Erro ao salvar: armazenamento cheio.', '⚠');
+  // ========================================
+  // MIGRATION
+  // ========================================
+  
+  /**
+   * Migra conteúdo de versão antiga para atual
+   */
+  function migrateContent(oldContent, fromVersion) {
+    let migrated = JSON.parse(JSON.stringify(oldContent));
+    
+    // Migração da v0 para v1
+    if (fromVersion < 1) {
+      log('Migração v0 → v1');
+      
+      // Adiciona metadata
+      if (!migrated._metadata) {
+        migrated._metadata = {
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+    
+    // Migração da v1 para v2
+    if (fromVersion < 2) {
+      log('Migração v1 → v2');
+      
+      // Garante campos em tracks
+      if (migrated.discografia?.albums) {
+        migrated.discografia.albums.forEach(album => {
+          if (!Array.isArray(album.tracks)) {
+            album.tracks = [];
+          }
+          
+          album.tracks.forEach(track => {
+            if (track.previewStart == null) track.previewStart = 0;
+            if (track.previewDuration == null) track.previewDuration = 30;
+            if (track.previewAudio == null) track.previewAudio = '';
+            if (track.fullAudio == null) track.fullAudio = '';
+            if (track.price == null) {
+              track.price = migrated.loja?.defaultPrice || 4.90;
+            }
+            if (track.forSale == null) track.forSale = true;
+          });
+        });
+      }
+    }
+    
+    // Migração da v2 para v3
+    if (fromVersion < 3) {
+      log('Migração v2 → v3');
+      
+      // Converte preços de string para número nos planos
+      if (migrated.planos?.plans) {
+        migrated.planos.plans.forEach(plan => {
+          if (typeof plan.price === 'string') {
+            plan.priceFormatted = plan.price;
+            plan.price = parseFloat(plan.price.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+          }
+        });
+      }
+    }
+    
+    // Migração da v3 para v4
+    if (fromVersion < 4) {
+      log('Migração v3 → v4');
+      
+      // Adiciona campos opcionais
+      if (migrated.sobre && !migrated.sobre.stats) {
+        migrated.sobre.stats = [];
+      }
+      
+      if (migrated.filosofia?.frases) {
+        migrated.filosofia.frases.forEach(frase => {
+          if (typeof frase.featured === 'undefined') {
+            frase.featured = false;
+          }
+        });
+      }
+    }
+    
+    // Migração da v4 para v5
+    if (fromVersion < 5) {
+      log('Migração v4 → v5');
+      
+      // Adiciona configurações de loja
+      if (migrated.loja) {
+        if (!migrated.loja.paymentMethods) {
+          migrated.loja.paymentMethods = ['credit_card', 'pix', 'boleto'];
+        }
+        if (migrated.loja.taxRate == null) {
+          migrated.loja.taxRate = 0;
+        }
+        if (migrated.loja.showTaxInfo == null) {
+          migrated.loja.showTaxInfo = false;
+        }
+      }
+    }
+    
+    // Atualiza versão
+    migrated._metadata = migrated._metadata || {};
+    migrated._metadata.version = CURRENT_SCHEMA_VERSION;
+    migrated._metadata.updatedAt = new Date().toISOString();
+    
+    return migrated;
   }
-}
 
-function deepMerge(target, source) {
-  for (var k in source) {
-    if (source[k] && typeof source[k] === 'object' && !Array.isArray(source[k])) {
-      target[k] = deepMerge(target[k] || {}, source[k]);
+  /**
+   * Deep merge inteligente (preserva arrays)
+   */
+  function deepMerge(target, source) {
+    if (!source || typeof source !== 'object') return target;
+    if (!target || typeof target !== 'object') return source;
+    
+    const result = Array.isArray(target) ? [...target] : { ...target };
+    
+    for (const key in source) {
+      if (source.hasOwnProperty(key)) {
+        if (
+          source[key] &&
+          typeof source[key] === 'object' &&
+          !Array.isArray(source[key]) &&
+          target[key] &&
+          typeof target[key] === 'object' &&
+          !Array.isArray(target[key])
+        ) {
+          result[key] = deepMerge(target[key], source[key]);
+        } else {
+          result[key] = source[key];
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  // ========================================
+  // ADMIN CREDENTIALS
+  // ========================================
+  
+  /**
+   * Obtém credenciais do admin
+   */
+  async function getAdminCreds() {
+    try {
+      const creds = readStorage(STORAGE_KEYS.ADMIN);
+      if (creds && creds.user && creds.passHash) {
+        return creds;
+      }
+    } catch (error) {
+      logError('Erro ao ler credenciais:', error);
+    }
+    
+    // Cria credenciais padrão
+    const defaultCreds = {
+      user: 'admin',
+      passHash: typeof hashStr === 'function' ? await hashStr('admin123') : 'admin123'
+    };
+    
+    writeStorage(STORAGE_KEYS.ADMIN, defaultCreds);
+    return defaultCreds;
+  }
+
+  /**
+   * Salva credenciais do admin
+   */
+  async function saveAdminCreds(user, plainPass) {
+    if (!user || typeof user !== 'string') {
+      logError('Usuário inválido');
+      return false;
+    }
+    
+    const current = await getAdminCreds();
+    const creds = { user };
+    
+    if (plainPass) {
+      creds.passHash = typeof hashStr === 'function' 
+        ? await hashStr(plainPass) 
+        : plainPass;
     } else {
-      target[k] = source[k];
+      creds.passHash = current.passHash;
+    }
+    
+    const success = writeStorage(STORAGE_KEYS.ADMIN, creds);
+    
+    if (success) {
+      log('Credenciais do admin salvas');
+    }
+    
+    return success;
+  }
+
+  // ========================================
+  // USERS
+  // ========================================
+  
+  function getUsers() {
+    return readStorage(STORAGE_KEYS.USERS, []);
+  }
+
+  function saveUsers(users) {
+    if (!Array.isArray(users)) {
+      logError('users deve ser um array');
+      return false;
+    }
+    return writeStorage(STORAGE_KEYS.USERS, users);
+  }
+
+  function getSession() {
+    return readStorage(STORAGE_KEYS.SESSION, null);
+  }
+
+  function setSession(session) {
+    if (session) {
+      return writeStorage(STORAGE_KEYS.SESSION, session);
+    } else {
+      return removeStorage(STORAGE_KEYS.SESSION);
     }
   }
-  return target;
-}
 
-/* ============================================================
-   ADMIN — credenciais (SHA-256 com migração legada)
-   ============================================================ */
-async function getAdminCreds() {
-  try {
-    var c = JSON.parse(localStorage.getItem(ADMIN_KEY));
-    if (c && c.user && c.passHash) return c;
-  } catch (e) {}
-  var def = { user: 'admin', passHash: await hashStr('admin123') };
-  try { localStorage.setItem(ADMIN_KEY, JSON.stringify(def)); } catch (e) {}
-  return def;
-}
-
-async function saveAdminCreds(user, plainPass) {
-  var current = await getAdminCreds();
-  var creds = { user: user };
-  creds.passHash = plainPass ? await hashStr(plainPass) : current.passHash;
-  try { localStorage.setItem(ADMIN_KEY, JSON.stringify(creds)); } catch (e) {}
-}
-
-/* ============================================================
-   USUÁRIOS
-   ============================================================ */
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; }
-  catch (e) { return []; }
-}
-function saveUsers(users) {
-  try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch (e) {}
-}
-function getSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
-  catch (e) { return null; }
-}
-function setSession(s) {
-  if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
-  else localStorage.removeItem(SESSION_KEY);
-}
-function currentUser() {
-  var s = getSession();
-  if (!s) return null;
-  return getUsers().find(function (u) { return u.id === s.userId; }) || null;
-}
-function isPremium() {
-  var u = currentUser();
-  return !!(u && (u.plan === 'premium' || u.plan === 'anual'));
-}
-function updateUserPlan(userId, plan) {
-  var users = getUsers();
-  var i = users.findIndex(function (u) { return u.id === userId; });
-  if (i < 0) return false;
-  users[i].plan = plan;
-  users[i].planSince = Date.now();
-  saveUsers(users);
-  return true;
-}
-function toggleUserBan(userId) {
-  var users = getUsers();
-  var i = users.findIndex(function (u) { return u.id === userId; });
-  if (i < 0) return;
-  users[i].banned = !users[i].banned;
-  saveUsers(users);
-}
-function deleteUser(userId) {
-  saveUsers(getUsers().filter(function (u) { return u.id !== userId; }));
-}
-function updateUserPasswordHash(userId, newHash) {
-  var users = getUsers();
-  var i = users.findIndex(function (u) { return u.id === userId; });
-  if (i < 0) return false;
-  users[i].passwordHash = newHash;
-  saveUsers(users);
-  return true;
-}
-
-/* ============================================================
-   LOJA — carrinho
-   ============================================================ */
-function getCart() {
-  try {
-    var raw = localStorage.getItem(CART_KEY);
-    if (!raw) return [];
-    var parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('[CART] Erro ao ler carrinho:', e);
-    return [];
-  }
-}
-
-function saveCart(cart) {
-  try {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart || []));
-    _cartLog('saveCart OK, itens:', (cart || []).length);
-  } catch (e) {
-    console.error('[CART] Erro ao gravar carrinho:', e);
-    toast('Erro ao salvar o carrinho.', '⚠');
-  }
-  _notifyCartChanged();
-}
-
-function clearCart() {
-  saveCart([]);
-}
-
-function addToCart(albumId, trackIndex) {
-  _cartLog('addToCart chamado:', albumId, trackIndex);
-
-  if (!albumId && albumId !== 0) { _cartLog('albumId inválido'); return false; }
-  trackIndex = parseInt(trackIndex, 10);
-  if (isNaN(trackIndex) || trackIndex < 0) { _cartLog('trackIndex inválido'); return false; }
-
-  var cart = getCart();
-  var exists = cart.some(function (i) {
-    return i.albumId === albumId && Number(i.trackIndex) === trackIndex;
-  });
-  if (exists) { _cartLog('já está no carrinho'); return false; }
-
-  if (!CONTENT || !CONTENT.discografia || !Array.isArray(CONTENT.discografia.albums)) {
-    _cartLog('CONTENT.discografia.albums não disponível');
-    return false;
+  function currentUser() {
+    const session = getSession();
+    if (!session || !session.userId) return null;
+    
+    const users = getUsers();
+    return users.find(u => u.id === session.userId) || null;
   }
 
-  var album = CONTENT.discografia.albums.find(function (a) { return a.id === albumId; });
-  if (!album) { _cartLog('álbum não encontrado:', albumId); return false; }
+  function isPremium() {
+    const user = currentUser();
+    return !!(user && (user.plan === 'premium' || user.plan === 'anual'));
+  }
 
-  var track = album.tracks && album.tracks[trackIndex];
-  if (!track) { _cartLog('faixa não encontrada no índice:', trackIndex); return false; }
+  function updateUserPlan(userId, plan) {
+    const users = getUsers();
+    const index = users.findIndex(u => u.id === userId);
+    
+    if (index < 0) {
+      logError(`Usuário não encontrado: ${userId}`);
+      return false;
+    }
+    
+    users[index].plan = plan;
+    users[index].planSince = Date.now();
+    
+    const success = saveUsers(users);
+    
+    if (success) {
+      log(`Plano atualizado para usuário ${userId}: ${plan}`);
+    }
+    
+    return success;
+  }
 
-  var defaultPrice = (CONTENT.loja && CONTENT.loja.defaultPrice) || 4.90;
-  var price = parseFloat(track.price);
-  if (isNaN(price) || price <= 0) price = defaultPrice;
+  function toggleUserBan(userId) {
+    const users = getUsers();
+    const index = users.findIndex(u => u.id === userId);
+    
+    if (index < 0) {
+      logError(`Usuário não encontrado: ${userId}`);
+      return false;
+    }
+    
+    users[index].banned = !users[index].banned;
+    const success = saveUsers(users);
+    
+    if (success) {
+      log(`Status de ban toggled para usuário ${userId}`);
+    }
+    
+    return success;
+  }
 
-  cart.push({
-    albumId: albumId,
-    trackIndex: trackIndex,
-    title: track.title,
-    albumTitle: album.title,
-    albumCover: album.coverImage || '',
-    albumCoverText: album.cover || '',
-    price: price
-  });
+  function deleteUser(userId) {
+    const users = getUsers();
+    const filtered = users.filter(u => u.id !== userId);
+    const success = saveUsers(filtered);
+    
+    if (success) {
+      log(`Usuário deletado: ${userId}`);
+    }
+    
+    return success;
+  }
 
-  saveCart(cart);
-  _cartLog('adicionado com sucesso. total itens:', cart.length);
-  return true;
-}
+  function updateUserPasswordHash(userId, newHash) {
+    const users = getUsers();
+    const index = users.findIndex(u => u.id === userId);
+    
+    if (index < 0) {
+      logError(`Usuário não encontrado: ${userId}`);
+      return false;
+    }
+    
+    users[index].passwordHash = newHash;
+    const success = saveUsers(users);
+    
+    if (success) {
+      log(`Hash de senha atualizado para usuário ${userId}`);
+    }
+    
+    return success;
+  }
 
-function removeFromCart(albumId, trackIndex) {
-  trackIndex = parseInt(trackIndex, 10);
-  var cart = getCart().filter(function (i) {
-    return !(i.albumId === albumId && Number(i.trackIndex) === trackIndex);
-  });
-  saveCart(cart);
-  return cart;
-}
+  // ========================================
+  // CART
+  // ========================================
+  
+  function getCart() {
+    const cart = readStorage(STORAGE_KEYS.CART, []);
+    return Array.isArray(cart) ? cart : [];
+  }
 
-function isInCart(albumId, trackIndex) {
-  trackIndex = parseInt(trackIndex, 10);
-  return getCart().some(function (i) {
-    return i.albumId === albumId && Number(i.trackIndex) === trackIndex;
-  });
-}
+  function saveCart(cart) {
+    if (!Array.isArray(cart)) {
+      logError('cart deve ser um array');
+      return false;
+    }
+    
+    const success = writeStorage(STORAGE_KEYS.CART, cart);
+    
+    if (success) {
+      log(`Carrinho salvo: ${cart.length} itens`);
+      notifyCartChanged();
+    }
+    
+    return success;
+  }
 
-function cartSubtotal() {
-  return getCart().reduce(function (s, i) { return s + (Number(i.price) || 0); }, 0);
-}
+  function clearCart() {
+    return saveCart([]);
+  }
 
-function cartDiscount() {
-  var cfg = CONTENT.loja || {};
-  var n = getCart().length;
-  if (!cfg.discountMinItems || n < cfg.discountMinItems) return 0;
-  return cartSubtotal() * ((cfg.discountPercent || 0) / 100);
-}
-
-function cartTotal() {
-  return Math.max(0, cartSubtotal() - cartDiscount());
-}
-
-/* ============================================================
-   LOJA — compras
-   ============================================================ */
-function getPurchases() {
-  try { return JSON.parse(localStorage.getItem(PURCHASES_KEY)) || {}; }
-  catch (e) { return {}; }
-}
-function savePurchases(p) {
-  try { localStorage.setItem(PURCHASES_KEY, JSON.stringify(p)); } catch (e) {}
-}
-function ownsTrack(albumId, trackIndex) {
-  var u = currentUser();
-  if (!u) return false;
-  var all = getPurchases();
-  var list = all[u.email] || [];
-  trackIndex = parseInt(trackIndex, 10);
-  return list.some(function (p) {
-    return p.albumId === albumId && Number(p.trackIndex) === trackIndex;
-  });
-}
-function registerPurchase(email, items) {
-  var all = getPurchases();
-  if (!all[email]) all[email] = [];
-  var orderId = generateId('ord');
-  var now = Date.now();
-  items.forEach(function (item) {
-    all[email].push({
-      orderId: orderId,
-      albumId: item.albumId,
-      trackIndex: item.trackIndex,
-      title: item.title,
-      albumTitle: item.albumTitle,
-      price: item.price,
-      date: now
+  function addToCart(albumId, trackIndex) {
+    if (!albumId && albumId !== 0) {
+      logError('albumId inválido');
+      return false;
+    }
+    
+    trackIndex = parseInt(trackIndex, 10);
+    if (isNaN(trackIndex) || trackIndex < 0) {
+      logError('trackIndex inválido');
+      return false;
+    }
+    
+    const cart = getCart();
+    
+    // Verifica se já existe
+    const exists = cart.some(item => 
+      item.albumId === albumId && Number(item.trackIndex) === trackIndex
+    );
+    
+    if (exists) {
+      log('Item já está no carrinho');
+      return false;
+    }
+    
+    // Busca dados da faixa
+    const content = getContent();
+    if (!content?.discografia?.albums) {
+      logError('Discografia não disponível');
+      return false;
+    }
+    
+    const album = content.discografia.albums.find(a => a.id === albumId);
+    if (!album) {
+      logError(`Álbum não encontrado: ${albumId}`);
+      return false;
+    }
+    
+    const track = album.tracks?.[trackIndex];
+    if (!track) {
+      logError(`Faixa não encontrada: ${albumId}[${trackIndex}]`);
+      return false;
+    }
+    
+    // Calcula preço
+    const defaultPrice = content.loja?.defaultPrice || 4.90;
+    let price = parseFloat(track.price);
+    if (isNaN(price) || price <= 0) {
+      price = defaultPrice;
+    }
+    
+    // Adiciona ao carrinho
+    cart.push({
+      albumId,
+      trackIndex,
+      title: track.title,
+      albumTitle: album.title,
+      albumCover: album.coverImage || '',
+      albumCoverText: album.cover || '',
+      price
     });
-  });
-  savePurchases(all);
-  return orderId;
-}
-function currentUserPurchases() {
-  var u = currentUser();
-  if (!u) return [];
-  return getPurchases()[u.email] || [];
-}
+    
+    const success = saveCart(cart);
+    
+    if (success) {
+      log(`Item adicionado ao carrinho: ${track.title}`);
+    }
+    
+    return success;
+  }
 
-/* ============================================================
-   FORMATAÇÃO
-   ============================================================ */
-function formatPrice(v) {
-  var sym = (CONTENT.loja && CONTENT.loja.currencySymbol) || 'R$';
-  var n = Number(v) || 0;
-  return sym + ' ' + n.toFixed(2).replace('.', ',');
+  function removeFromCart(albumId, trackIndex) {
+    trackIndex = parseInt(trackIndex, 10);
+    
+    const cart = getCart().filter(item => 
+      !(item.albumId === albumId && Number(item.trackIndex) === trackIndex)
+    );
+    
+    const success = saveCart(cart);
+    
+    if (success) {
+      log(`Item removido do carrinho: ${albumId}[${trackIndex}]`);
+    }
+    
+    return cart;
+  }
+
+  function isInCart(albumId, trackIndex) {
+    trackIndex = parseInt(trackIndex, 10);
+    
+    return getCart().some(item => 
+      item.albumId === albumId && Number(item.trackIndex) === trackIndex
+    );
+  }
+
+  function cartSubtotal() {
+    return getCart().reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  }
+
+  function cartDiscount() {
+    const content = getContent();
+    const config = content?.loja || {};
+    const itemCount = getCart().length;
+    
+    if (!config.discountMinItems || itemCount < config.discountMinItems) {
+      return 0;
+    }
+    
+    return cartSubtotal() * ((config.discountPercent || 0) / 100);
+  }
+
+  function cartTotal() {
+    return Math.max(0, cartSubtotal() - cartDiscount());
+  }
+
+  function notifyCartChanged() {
+    try {
+      if (typeof updateCartFab === 'function') {
+        updateCartFab();
+        log('updateCartFab() chamada');
+      } else {
+        log('Disparando evento cart:updated');
+        window.dispatchEvent(new CustomEvent('cart:updated'));
+      }
+    } catch (error) {
+      logError('Erro ao notificar mudança no carrinho:', error);
+    }
+  }
+
+  // ========================================
+  // PURCHASES
+  // ========================================
+  
+  function getPurchases() {
+    return readStorage(STORAGE_KEYS.PURCHASES, {});
+  }
+
+  function savePurchases(purchases) {
+    if (typeof purchases !== 'object' || purchases === null) {
+      logError('purchases deve ser um objeto');
+      return false;
+    }
+    
+    return writeStorage(STORAGE_KEYS.PURCHASES, purchases);
+  }
+
+  function ownsTrack(albumId, trackIndex) {
+    const user = currentUser();
+    if (!user) return false;
+    
+    const purchases = getPurchases();
+    const userPurchases = purchases[user.email] || [];
+    
+    trackIndex = parseInt(trackIndex, 10);
+    
+    return userPurchases.some(p => 
+      p.albumId === albumId && Number(p.trackIndex) === trackIndex
+    );
+  }
+
+  function registerPurchase(email, items) {
+    if (!email || !Array.isArray(items)) {
+      logError('Email ou itens inválidos');
+      return null;
+    }
+    
+    const purchases = getPurchases();
+    
+    if (!purchases[email]) {
+      purchases[email] = [];
+    }
+    
+    const orderId = typeof generateId === 'function' 
+      ? generateId('ord') 
+      : `ord_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    
+    const now = Date.now();
+    
+    items.forEach(item => {
+      purchases[email].push({
+        orderId,
+        albumId: item.albumId,
+        trackIndex: item.trackIndex,
+        title: item.title,
+        albumTitle: item.albumTitle,
+        price: item.price,
+        date: now
+      });
+    });
+    
+    const success = savePurchases(purchases);
+    
+    if (success) {
+      log(`Compra registrada: ${orderId} (${items.length} itens)`);
+    }
+    
+    return success ? orderId : null;
+  }
+
+  function currentUserPurchases() {
+    const user = currentUser();
+    if (!user) return [];
+    
+    const purchases = getPurchases();
+    return purchases[user.email] || [];
+  }
+
+  // ========================================
+  // FORMATAÇÃO
+  // ========================================
+  
+  function formatPrice(value) {
+    const content = getContent();
+    const symbol = content?.loja?.currencySymbol || 'R$';
+    const number = Number(value) || 0;
+    
+    return `${symbol} ${number.toFixed(2).replace('.', ',')}`;
+  }
+
+  // ========================================
+  // VOLUME
+  // ========================================
+  
+  function getVolume() {
+    const volume = readStorage(STORAGE_KEYS.VOLUME, 0.8);
+    const parsed = parseFloat(volume);
+    
+    if (isNaN(parsed) || parsed < 0 || parsed > 1) {
+      return 0.8;
+    }
+    
+    return parsed;
+  }
+
+  function setVolume(volume) {
+    if (typeof volume !== 'number' || volume < 0 || volume > 1) {
+      logError('Volume inválido');
+      return false;
+    }
+    
+    return writeStorage(STORAGE_KEYS.VOLUME, volume);
+  }
+
+  // ========================================
+  // ADMIN SESSION
+  // ========================================
+  
+  function getAdminSession() {
+    return readStorage(STORAGE_KEYS.ADMIN_SESSION, null);
+  }
+
+  function setAdminSession(session) {
+    if (session) {
+      return writeStorage(STORAGE_KEYS.ADMIN_SESSION, session);
+    } else {
+      return removeStorage(STORAGE_KEYS.ADMIN_SESSION);
+    }
+  }
+
+  // ========================================
+  // UTILITÁRIOS
+  // ========================================
+  
+  /**
+   * Limpa todos os dados do storage
+   */
+  function clearAllData() {
+    const keys = Object.values(STORAGE_KEYS);
+    let success = true;
+    
+    keys.forEach(key => {
+      if (!removeStorage(key)) {
+        success = false;
+      }
+    });
+    
+    if (success) {
+      log('Todos os dados foram limpos');
+    }
+    
+    return success;
+  }
+
+  /**
+   * Exporta todos os dados
+   */
+  function exportAllData() {
+    const data = {};
+    
+    Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
+      const value = readStorage(key);
+      if (value !== null) {
+        data[name.toLowerCase()] = value;
+      }
+    });
+    
+    return data;
+  }
+
+  /**
+   * Obtém estatísticas do storage
+   */
+  function getStorageStats() {
+    let totalSize = 0;
+    let itemCount = 0;
+    
+    Object.values(STORAGE_KEYS).forEach(key => {
+      try {
+        const value = localStorage.getItem(key);
+        if (value) {
+          totalSize += value.length + key.length;
+          itemCount++;
+        }
+      } catch (error) {
+        // Ignora
+      }
+    });
+    
+    return {
+      totalSize,
+      totalSizeFormatted: formatBytes(totalSize),
+      itemCount,
+      usedPercent: (totalSize / MAX_STORAGE_SIZE) * 100
+    };
+  }
+
+  function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
+  }
+
+  // ========================================
+  // INICIALIZAÇÃO
+  // ========================================
+  
+  function init() {
+    try {
+      initDebugMode();
+      log('Store inicializado');
+      
+      // Carrega conteúdo
+      content = loadContent();
+      window.CONTENT = content;
+      
+      log(`Conteúdo carregado: v${content?._metadata?.version || 'unknown'}`);
+      
+      return true;
+    } catch (error) {
+      logError('Erro na inicialização:', error);
+      return false;
+    }
+  }
+
+  // ========================================
+  // API PÚBLICA
+  // ========================================
+  
+  return {
+    // Inicialização
+    init,
+    
+    // Content
+    getContent,
+    setContent,
+    saveContent,
+    loadContent,
+    getDefaultContent,
+    
+    // Admin
+    getAdminCreds,
+    saveAdminCreds,
+    getAdminSession,
+    setAdminSession,
+    
+    // Users
+    getUsers,
+    saveUsers,
+    getSession,
+    setSession,
+    currentUser,
+    isPremium,
+    updateUserPlan,
+    toggleUserBan,
+    deleteUser,
+    updateUserPasswordHash,
+    
+    // Cart
+    getCart,
+    saveCart,
+    clearCart,
+    addToCart,
+    removeFromCart,
+    isInCart,
+    cartSubtotal,
+    cartDiscount,
+    cartTotal,
+    
+    // Purchases
+    getPurchases,
+    savePurchases,
+    ownsTrack,
+    registerPurchase,
+    currentUserPurchases,
+    
+    // Volume
+    getVolume,
+    setVolume,
+    
+    // Formatação
+    formatPrice,
+    
+    // Utilitários
+    clearAllData,
+    exportAllData,
+    getStorageStats,
+    setDebugMode,
+    
+    // Constantes
+    get STORAGE_KEYS() { return STORAGE_KEYS; },
+    get CURRENT_SCHEMA_VERSION() { return CURRENT_SCHEMA_VERSION; }
+  };
+})();
+
+// ========================================
+// EXPOSIÇÃO GLOBAL (Compatibilidade)
+// ========================================
+
+// Mantém compatibilidade com código existente
+window.CONTENT = Store.getContent();
+
+// Funções globais (legacy)
+window.getUsers = Store.getUsers;
+window.saveUsers = Store.saveUsers;
+window.getSession = Store.getSession;
+window.setSession = Store.setSession;
+window.currentUser = Store.currentUser;
+window.isPremium = Store.isPremium;
+window.updateUserPlan = Store.updateUserPlan;
+window.toggleUserBan = Store.toggleUserBan;
+window.deleteUser = Store.deleteUser;
+window.updateUserPasswordHash = Store.updateUserPasswordHash;
+
+window.getCart = Store.getCart;
+window.saveCart = Store.saveCart;
+window.clearCart = Store.clearCart;
+window.addToCart = Store.addToCart;
+window.removeFromCart = Store.removeFromCart;
+window.isInCart = Store.isInCart;
+window.cartSubtotal = Store.cartSubtotal;
+window.cartDiscount = Store.cartDiscount;
+window.cartTotal = Store.cartTotal;
+
+window.getPurchases = Store.getPurchases;
+window.savePurchases = Store.savePurchases;
+window.ownsTrack = Store.ownsTrack;
+window.registerPurchase = Store.registerPurchase;
+window.currentUserPurchases = Store.currentUserPurchases;
+
+window.formatPrice = Store.formatPrice;
+
+window.getAdminCreds = Store.getAdminCreds;
+window.saveAdminCreds = Store.saveAdminCreds;
+
+window.getContent = Store.getContent;
+window.setContent = Store.setContent;
+window.saveContent = Store.saveContent;
+window.loadContent = Store.loadContent;
+
+// Constantes
+window.CONTENT_KEY = Store.STORAGE_KEYS.CONTENT;
+window.USERS_KEY = Store.STORAGE_KEYS.USERS;
+window.SESSION_KEY = Store.STORAGE_KEYS.SESSION;
+window.ADMIN_KEY = Store.STORAGE_KEYS.ADMIN;
+window.ADMIN_SESSION_KEY = Store.STORAGE_KEYS.ADMIN_SESSION;
+window.VOLUME_KEY = Store.STORAGE_KEYS.VOLUME;
+window.CART_KEY = Store.STORAGE_KEYS.CART;
+window.PURCHASES_KEY = Store.STORAGE_KEYS.PURCHASES;
+window.SCHEMA_VERSION = Store.CURRENT_SCHEMA_VERSION;
+
+// Inicialização
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', Store.init);
+} else {
+  Store.init();
 }
