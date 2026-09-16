@@ -38,8 +38,11 @@ body {
   line-height: 1.5;
   scroll-behavior: smooth;
   overflow-x: hidden;
-  padding-bottom: var(--player-h);
+  padding-bottom: 0;
 }
+
+/* A reprodução acontece no player ampliado; não exibir a barra fixa inferior. */
+.player { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1468,6 +1471,9 @@ nav .nav-cart.pop { animation: navCartPop 0.35s ease; }
   .expanded-player-meta { text-align: center; }
   .expanded-player-actions { justify-content: center; }
 }
+
+body { padding-bottom: 0; }
+.player { display: none !important; }
 
 @media (max-width: 600px) {
   nav .nav-cart { padding: 0.4rem 0.6rem; }
