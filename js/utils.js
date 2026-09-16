@@ -37,7 +37,12 @@ function safeExternalUrl(value) {
 
 function safeMediaUrl(value) {
   var raw = String(value || '').trim();
-  if (/^(data:image\/(png|jpeg|jpg|webp);base64,|blob:|https?:|\/|\.\.\/|\.\/)/i.test(raw)) return raw;
+  if (!raw || /^(javascript|vbscript|file|data:text|data:application):/i.test(raw)) return '';
+  if (/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(raw) || /^blob:/i.test(raw)) return raw;
+  try {
+    var parsed = new URL(raw, window.location.href);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return raw;
+  } catch (e) {}
   return '';
 }
 
