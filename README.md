@@ -84,12 +84,19 @@ navegador. Configure estas variáveis no projeto Vercel:
 ```bash
 vercel env add ADMIN_USER production
 vercel env add ADMIN_PASSWORD_HASH production
+vercel env add ADMIN_SESSION_SECRET production
 ```
 
 Gere o hash bcrypt localmente antes de cadastrar a senha:
 
 ```bash
 node -e "require('bcryptjs').hash('uma-senha-forte', 12).then(console.log)"
+```
+
+Gere `ADMIN_SESSION_SECRET` com:
+
+```bash
+openssl rand -hex 32
 ```
 
 O modo demo continua disponível em `localhost`, usando `admin` / `admin123`.

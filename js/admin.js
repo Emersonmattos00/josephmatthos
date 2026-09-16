@@ -60,7 +60,6 @@ function showAdminDashboard() {
             return;
           }
           err.textContent = '';
-          sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
           e.target.reset();
           showAdminDashboard();
           toast('Bem-vindo ao painel.', '⚙');
@@ -94,7 +93,10 @@ function showAdminDashboard() {
 
   var logoutBtn = document.getElementById('adminLogout');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', function () {
+    logoutBtn.addEventListener('click', async function () {
+      if (typeof isProductionMode === 'function' && isProductionMode()) {
+        try { await fetch('/api/admin-logout', { method: 'POST', credentials: 'same-origin' }); } catch (error) {}
+      }
       sessionStorage.removeItem(ADMIN_SESSION_KEY);
       showAdminLogin();
       openPublicSite();
@@ -103,6 +105,15 @@ function showAdminDashboard() {
   }
 })();
 
+async function hasProductionAdminSession() {
+  try {
+    var response = await fetch('/api/admin-session', { credentials: 'same-origin' });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
 function openAdminSite() {
   var pub = document.getElementById('publicSite');
   var adm = document.getElementById('adminSite');
@@ -110,7 +121,12 @@ function openAdminSite() {
   if (adm) adm.style.display = 'block';
   document.body.style.paddingBottom = '0';
   window.scrollTo(0, 0);
-  if (sessionStorage.getItem(ADMIN_SESSION_KEY)) showAdminDashboard();
+  if (typeof isProductionMode === 'function' && isProductionMode()) {
+    showAdminLogin();
+    hasProductionAdminSession().then(function (valid) {
+      if (valid) showAdminDashboard();
+    });
+  } else if (sessionStorage.getItem(ADMIN_SESSION_KEY)) showAdminDashboard();
   else showAdminLogin();
 }
 

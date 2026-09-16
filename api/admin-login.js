@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { setSessionCookie } = require('./_admin-session');
 
 function sendJson(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -13,7 +14,7 @@ module.exports = async function handler(req, res) {
 
   const configuredUser = process.env.ADMIN_USER;
   const configuredHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!configuredUser || !configuredHash) {
+  if (!configuredUser || !configuredHash || !process.env.ADMIN_SESSION_SECRET) {
     return sendJson(res, 503, { ok: false, error: 'Autenticação do admin não configurada.' });
   }
 
@@ -37,5 +38,6 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 401, { ok: false, error: 'Usuário ou senha incorretos.' });
   }
 
+  setSessionCookie(res);
   return sendJson(res, 200, { ok: true });
 };
