@@ -250,20 +250,6 @@ Cada faixa aceita:
 
 ---
 
-## 🧪 Testando o painel admin
-
-1. Abra `index.html` (ou via servidor)
-2. Pressione **`Ctrl + Shift + A`**
-3. No modo demo, use `admin` / `admin123`; em produção, use as variáveis configuradas no Vercel.
-4. Explore as abas laterais
-
-**Dicas:**
-- Troque a senha em **Backup → Credenciais do admin**
-- Exporte um backup antes de mudanças grandes (**Backup → Exportar JSON**)
-- O botão **↺ Restaurar padrão** volta tudo ao `config.js` original
-
----
-
 ## 📱 Atalhos de teclado
 
 | Tecla | Ação |
