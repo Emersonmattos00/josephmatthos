@@ -1553,71 +1553,71 @@ footer .footer-nav span {
 }
 
 /* ============================================================
-   CORREÇÃO: Listagem de faixas em LINHA (dentro do álbum expandido)
+   ALTERNÂNCIA CARD vs LISTA (Respeitando o modo de exibição)
    ============================================================ */
 
-/* 1. Transforma o container de scroll horizontal em uma pilha vertical */
-.album-block.expanded .discography-scroll {
+/* -----------------------------------------------------------------
+   1. MODO LISTA: Quando o container principal está em modo lista, 
+   as faixas dentro do álbum expandido também viram lista vertical
+   ----------------------------------------------------------------- */
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-scroll,
+#discographyContainer.view-list .album-block.expanded .discography-scroll {
   display: flex !important;
   flex-direction: column !important;
-  flex-wrap: nowrap !important;
-  overflow-x: visible !important;
-  overflow-y: visible !important;
   gap: 0.4rem !important;
   padding: 0 !important;
-  counter-reset: track-index; /* Prepara a numeração automática das faixas */
+  overflow: visible !important;
+  counter-reset: track-index; /* Prepara a numeração automática */
 }
 
-/* 2. Transforma o card quadrado em uma linha horizontal de largura total */
-.album-block.expanded .discography-track-card {
-  flex: 1 1 100% !important;
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-card,
+#discographyContainer.view-list .album-block.expanded .discography-track-card {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) auto !important; /* Nº | Info | Preço/Ação */
   width: 100% !important;
   min-width: 100% !important;
   max-width: 100% !important;
-  display: grid !important;
-  grid-template-columns: 36px minmax(0, 1fr) auto !important; /* Nº | Info | Preço/Ação */
-  align-items: center !important;
-  gap: 0.8rem !important;
   padding: 0.6rem 0.8rem !important;
-  min-height: auto !important;
   border-radius: 8px !important;
   transition: background 0.2s !important;
 }
 
-.album-block.expanded .discography-track-card:hover {
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-card:hover,
+#discographyContainer.view-list .album-block.expanded .discography-track-card:hover {
   background: rgba(212, 175, 55, 0.04) !important;
 }
 
-/* 3. Numeração automática das faixas (1, 2, 3...) */
-.album-block.expanded .discography-track-card::before {
+/* Numeração automática das faixas (1, 2, 3...) */
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-card::before,
+#discographyContainer.view-list .album-block.expanded .discography-track-card::before {
   counter-increment: track-index;
   content: counter(track-index);
   color: var(--text-dim);
   font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
-  font-variant-numeric: tabular-nums; /* Mantém os números alinhados */
+  font-variant-numeric: tabular-nums;
 }
 
-/* 4. Esconde a capa quadrada da faixa (redundante, pois a capa do álbum já está no cabeçalho) */
-.album-block.expanded .discography-track-cover {
+/* Esconde a capa quadrada da faixa no modo lista (redundante) */
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-cover,
+#discographyContainer.view-list .album-block.expanded .discography-track-cover {
   display: none !important;
 }
 
-/* 5. Reorganiza o corpo do card para ficar em linha (Título + Duração) */
-.album-block.expanded .discography-track-body {
+/* Reorganiza o corpo do card para ficar em linha (Título + Duração) */
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-body,
+#discographyContainer.view-list .album-block.expanded .discography-track-body {
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
-  justify-content: flex-start !important;
   gap: 0.8rem !important;
   padding: 0 !important;
   border: none !important;
 }
 
-/* 6. Ajusta o título para não quebrar linha e mostrar reticências (...) */
-.album-block.expanded .discography-track-title {
-  font-size: 0.95rem !important;
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-title,
+#discographyContainer.view-list .album-block.expanded .discography-track-title {
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -1626,16 +1626,9 @@ footer .footer-nav span {
   display: block !important;
 }
 
-/* 7. Metadados (duração, tipo) ao lado do título, sem quebrar linha */
-.album-block.expanded .discography-track-meta {
-  display: inline-flex !important;
-  align-items: center !important;
-  margin-top: 0 !important;
-  flex-shrink: 0;
-}
-
-/* 8. Reorganiza o rodapé (preço e botão) para a direita */
-.album-block.expanded .discography-track-footer {
+/* Reorganiza o rodapé (preço e botão) para a direita */
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-footer,
+#discographyContainer.view-list .album-block.expanded .discography-track-footer {
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
@@ -1644,59 +1637,92 @@ footer .footer-nav span {
   margin-top: 0 !important;
   padding-top: 0 !important;
   border-top: none !important;
-  min-width: 150px !important; /* Garante espaço mínimo para preço + botão */
+  min-width: 150px !important;
 }
 
-/* 9. Ajusta o preço para ficar compacto na lista */
-.album-block.expanded .discography-track-price {
-  font-size: 1rem !important;
-  text-align: right !important;
-  line-height: 1 !important;
-}
-
-.album-block.expanded .discography-track-price small {
-  display: none !important; /* Esconde "por faixa" para economizar espaço horizontal */
-}
-
-/* 10. Ajusta o botão de compra para não ocupar largura total */
-.album-block.expanded .discography-track-btn {
+#discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-btn,
+#discographyContainer.view-list .album-block.expanded .discography-track-btn {
   width: auto !important;
   padding: 0.4rem 0.9rem !important;
-  font-size: 0.7rem !important;
   white-space: nowrap !important;
 }
 
-/* ============================================================
-   AJUSTE RESPONSIVO PARA A LISTA EXPANDIDA (Mobile)
-   ============================================================ */
+/* -----------------------------------------------------------------
+   2. MODO CARD (Padrão): Mantém o scroll horizontal dentro do álbum
+   ----------------------------------------------------------------- */
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-scroll,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-scroll {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  gap: 0.85rem !important;
+  padding: 0.3rem 0.2rem 0.9rem !important;
+}
+
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-track-card,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-track-card {
+  flex: 0 0 180px !important;
+  width: 180px !important;
+  min-width: 180px !important;
+  max-width: 180px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Garante que a capa apareça no modo card */
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-track-cover,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-track-cover {
+  display: flex !important;
+}
+
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-track-body,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-track-body {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0.75rem 0.8rem 0.85rem !important;
+}
+
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-track-footer,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-track-footer {
+  display: flex !important;
+  flex-direction: column !important;
+  margin-top: auto !important;
+  padding-top: 0.7rem !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+#discographyContainer[data-view-mode="cards"] .album-block.expanded .discography-track-btn,
+#discographyContainer:not([data-view-mode="list"]) .album-block.expanded .discography-track-btn {
+  width: 100% !important;
+}
+
+/* -----------------------------------------------------------------
+   3. AJUSTE RESPONSIVO PARA O MODO LISTA (Mobile)
+   ----------------------------------------------------------------- */
 @media (max-width: 600px) {
-  .album-block.expanded .discography-track-card {
-    grid-template-columns: 28px 1fr !important; /* Remove a coluna da direita no mobile */
+  #discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-card,
+  #discographyContainer.view-list .album-block.expanded .discography-track-card {
+    grid-template-columns: 28px 1fr !important;
     gap: 0.5rem !important;
     padding: 0.8rem 0.6rem !important;
   }
   
-  .album-block.expanded .discography-track-body {
+  #discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-body,
+  #discographyContainer.view-list .album-block.expanded .discography-track-body {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.3rem !important;
   }
 
   /* No mobile, preço e botão vão para uma linha própria abaixo do título */
-  .album-block.expanded .discography-track-footer {
+  #discographyContainer[data-view-mode="list"] .album-block.expanded .discography-track-footer,
+  #discographyContainer.view-list .album-block.expanded .discography-track-footer {
     grid-column: 1 / -1 !important;
     justify-content: space-between !important;
     margin-top: 0.4rem !important;
     padding-top: 0.4rem !important;
     border-top: 1px solid var(--border) !important;
     min-width: 100% !important;
-  }
-
-  .album-block.expanded .discography-track-price {
-    text-align: left !important;
-  }
-  
-  .album-block.expanded .discography-track-btn {
-    padding: 0.4rem 0.8rem !important;
   }
 }
