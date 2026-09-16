@@ -1,10 +1,15 @@
 const crypto = require('crypto');
 
-const COOKIE_NAME = 'jm_admin_session';
+const COOKIE_NAME = '__Host-jm_admin_session';
 const MAX_AGE = 8 * 60 * 60;
+const MIN_SECRET_LENGTH = 32;
 
 function getSecret() {
-  return process.env.ADMIN_SESSION_SECRET || '';
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error('ADMIN_SESSION_SECRET ausente ou muito curto');
+  }
+  return secret;
 }
 
 function sign(value) {
@@ -33,11 +38,14 @@ function parseCookies(header) {
 }
 
 function isValidToken(token) {
-  if (!getSecret() || typeof token !== 'string') return false;
+  let secret;
+  try { secret = getSecret(); } catch { return false; }
+  if (typeof token !== 'string') return false;
   const parts = token.split('.');
   if (parts.length !== 2) return false;
   const expected = sign(parts[0]);
   const provided = parts[1];
+  if (!expected || !provided) return false;
   if (expected.length !== provided.length) return false;
   if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided))) return false;
 
